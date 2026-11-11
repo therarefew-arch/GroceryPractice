@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grocery Practice</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header id="hud">
+    <div class="grp">
+      <b id="h-day">Day 1</b>
+      <span id="h-time" class="time">5:00 AM</span>
+      <span id="h-phase" class="pill">Pre-open</span>
+    </div>
+    <div class="grp stats">
+      <span title="Sales vs today's goal">💵 <b id="h-sales">$0</b><small id="h-goal"> / $0</small></span>
+      <span title="Customer satisfaction (0–100)">🙂 <b id="h-sat">80</b></span>
+      <span title="Labor as % of sales (target 12% or less)">👷 <b id="h-labor">—</b></span>
+      <span title="Truck cases left on pallets and floats">🚚 <b id="h-truck">0</b></span>
+      <span title="Unread email — read it at the office computer">📧 <b id="h-mail">0</b></span>
+      <button id="btn-pc" title="Where is the computer?">🖥️</button>
+    </div>
+    <div class="grp">
+      <div class="lvl"><span><span id="h-title">Lv 1</span> · <span class="mute">bank</span> <b id="h-bank">$0</b></span><div class="xpbar"><div id="h-xp"></div></div></div>
+      <div class="speed">
+        <button data-speed="0" title="Pause (P)">⏸</button>
+        <button data-speed="1" title="Normal speed (1)">1×</button>
+        <button data-speed="2" title="Fast (2)">2×</button>
+        <button data-speed="4" title="Faster (3)">4×</button>
+      </div>
+      <button id="btn-endnight" class="primary hidden">End night ▶</button>
+    </div>
+  </header>
+  <div id="stage"><canvas id="c"></canvas><div id="toasts"></div></div>
+  <footer id="bar">
+    <span id="prompt"></span>
+    <span id="holding"></span>
+    <span class="keys">WASD move · Shift run · E interact · P pause · 1/2/3 speed</span>
+  </footer>
+
+  <div id="modal" class="hidden"><div class="modal-card" id="modal-card"></div></div>
+  <div id="computer" class="hidden">
+    <div class="pc">
+      <div class="pc-top"><span>🖥️ StoreNet — Manager Workstation</span><button id="pc-close">✕ Log off (Esc)</button></div>
+      <div class="pc-body"><nav id="pc-tabs"></nav><main id="pc-main"></main></div>
+    </div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/ui.js"></script>
+  <script>boot();</script>
+</body>
+</html>
