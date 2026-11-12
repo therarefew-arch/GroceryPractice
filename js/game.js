@@ -8,7 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1380, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.7'; // bump the last number on every update
+const VERSION = '0.0.8'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -62,7 +62,7 @@ function makeCase(dept) { const it = wpick(DEPT[dept].items, i => i[1]); return 
 const floatById = id => G.floats.find(f => f.id === id);
 const floatOf = dept => G.floats.find(f => f.dept === dept);
 const shelfPct = dept => G.stock[dept].shelf / DEPT[dept].capU;
-const canStock = dept => DEPT[dept].capU - G.stock[dept].shelf >= DEPT[dept].upc * 0.5;
+const canStock = dept => !coolerBlocked(dept) && DEPT[dept].capU - G.stock[dept].shelf >= DEPT[dept].upc * 0.5;
 const endcapCount = dept => Object.values(G.endcaps).filter(v => v === dept).length;
 const promoLift = dept => 1 + 0.12 * Math.min(2, endcapCount(dept));
 const crewName = id => (G.crew.find(c => c.id === id) || { name: 'Someone' }).name;
@@ -195,6 +195,7 @@ function newGame() {
     ad: null, today: null, lastResult: null, pastDays: [], nightLabor: 0, overtime: 0, nightPallets: 0,
     player: { x: 30.5, y: 6.5, fx: 0, fy: 1, carry: [], floatId: null, pallet: null, work: null },
   };
+  applyCatalog();
   DEPTS.forEach(d => {
     G.stock[d.id] = { shelf: Math.round(d.capU * 0.3), back: d.upc };
     G.history[d.id] = Array.from({ length: 7 }, () => Math.round(d.demand * d.upc * rand(0.88, 1.12)));
@@ -264,6 +265,7 @@ function startDay() {
     G.ad = { depts: G.nextAd, from: G.day }; G.nextAd = null;
     mail('District Manager', 'New ad is live', `Today's ad features ${G.ad.depts.map(d => DEPT[d].name).join(' & ')}. Verify every ad endcap is up and full by noon.`);
   }
+  eventsStartDay();
   G.list = buildChecklist();
   const nt = nextTruckDay(G.day);
   mail('District Manager', `${WEEKDAY_NAMES[dowIdx(G.day)]} game plan (${dayLabel(G.day)})`, [
@@ -296,7 +298,7 @@ function endDay() {
   G.crew.forEach(despawnCrew);
   tenureDay();
   const res = computeResults();
-  res.tips.push(...moraleDay(res));
+  res.tips.push(...moraleDay(res), ...eventsTips());
   DEPTS.forEach(d => {
     G.history[d.id].push(t.demand[d.id] || 0);
     if (G.history[d.id].length > 14) G.history[d.id].shift();
@@ -425,6 +427,7 @@ function update(dt) {
     orderWindowTick(prev);
     listTick();
     conflictTick(gm);
+    eventsTick(prev, gm);
     if (G.time > OPEN && G.time < CLOSE - 60 && Math.random() < gm / 140) {
       const before = G.tags.length;
       addTag('error');
@@ -457,7 +460,7 @@ function orderWindowTick(prev) {
 
 function onHour(h) {
   if (h >= 9 && h <= 21) spoilCheck();
-  mentorHour(); trashHour(); moraleHour();
+  mentorHour(); trashHour(); moraleHour(); eventsHour(h);
   if (h === 13 && G.sat < 55) mail('Customer Service Desk', 'Complaints are piling up', 'We\'re getting a lot of complaints about empty shelves and wrong prices today. Can someone check the floor?');
   if (h === 16) toast('🛒 Rush hour is coming (4–7 PM). Top off the fast movers now!', 'warn');
   if (h % 2 === 0) save();
@@ -494,7 +497,7 @@ function spawnCustomers(gm) {
 function spawnCustomer() {
   const n = randi(2, 4), stops = [], pool = DEPTS.slice();
   for (let i = 0; i < n && pool.length; i++) {
-    const d = wpick(pool, x => x.demand * x.upc * promoLift(x.id));
+    const d = wpick(pool, x => x.demand * x.upc * promoLift(x.id) * catalogFactor(x.id) * seasonLift(x.id, G.day));
     stops.push(d.id); pool.splice(pool.indexOf(d), 1);
   }
   const door = pick(MAPD.frontDoor);
@@ -532,12 +535,14 @@ function updateCustomers(dt) {
 
 function buy(cu, dept) {
   const d = DEPT[dept], s = G.stock[dept], t = G.today;
-  const q = randi(1, 3) + (endcapCount(dept) && Math.random() < 0.3 ? 1 : 0);
+  let q = randi(1, 3) + (endcapCount(dept) && Math.random() < 0.3 ? 1 : 0);
+  const sl = seasonLift(dept, G.day);
+  if (sl > 1 && Math.random() < Math.min(1, (sl - 1) * 1.6)) q++;
   t.requests++;
   t.demand[dept] = (t.demand[dept] || 0) + q;
   const it = wpick(d.items, i => i[1])[0];
   t.itemDemand[it] = (t.itemDemand[it] || 0) + q;
-  if (s.shelf <= 0) {
+  if (s.shelf - codeExp(dept) <= 0) {
     t.misses++;
     t.lost[dept] = (t.lost[dept] || 0) + q;
     G.sat = Math.max(0, G.sat - 0.7);
@@ -548,9 +553,9 @@ function buy(cu, dept) {
     }
     return;
   }
-  const got = Math.min(q, s.shelf);
+  const got = Math.min(q, s.shelf - codeExp(dept));
   s.shelf -= got;
-  t.sales += got * d.price;
+  t.sales += got * d.price - codesSold(dept, got, cu);
   t.units[dept] = (t.units[dept] || 0) + got;
   G.sat = Math.min(100, G.sat + 0.06);
   const tag = G.tags.find(tg => tg.dept === dept && tg.kind === 'error') || G.tags.find(tg => tg.dept === dept);
@@ -991,6 +996,8 @@ function getInteraction() {
   }
   const cf = !p.work && conflictInteraction(p);
   if (cf) return cf;
+  const ev = !p.work && eventsInteraction(p, shelfDept, true);
+  if (ev) return ev;
   const coachee = G.crew.find(c => c.needsCoach && RT.crew[c.id] && RT.crew[c.id].inBuilding && dist(RT.crew[c.id], p) < 1.5);
   if (coachee && !p.work) return { label: `Coach ${coachee.name}: ${TRAIN_AREAS[coachee.needsCoach.area].mistake}`, fn: () => { const rr = RT.crew[coachee.id]; if (rr) rr.hold = 2.5; startWork(2.5, 'Coaching', () => coachCrew(coachee)); } };
   const trash = (G.trash || []).find(t => dist(t, p) < 1.1);
@@ -1019,6 +1026,8 @@ function getInteraction() {
     return { label: `Push the ${DEPT[fl.dept].name} float (${plural(fl.cases.length, 'case')})`, fn: () => grabFloat(fl) };
   }
   if (rackDept && G.stock[rackDept].back > 0) return { label: `Pull backstock: ${DEPT[rackDept].name} (${Math.ceil(G.stock[rackDept].back / DEPT[rackDept].upc)} cs)`, fn: () => playerPullBack(rackDept) };
+  const ev2 = !p.work && eventsInteraction(p, shelfDept, false);
+  if (ev2) return ev2;
   const mi = !p.work && moraleInteraction(p);
   if (mi) return mi;
   if (shelfDept) return { label: `${DEPT[shelfDept].aisle} · ${DEPT[shelfDept].name}: shelf ${Math.round(shelfPct(shelfDept) * 100)}% full`, fn: null };
@@ -1120,6 +1129,7 @@ function load() {
     const s = JSON.parse(raw);
     if (s.version !== 1) return false;
     G = s;
+    applyCatalog();
     G.trash = G.trash || [];
     G.crew.forEach(c => ensureMorale(ensureTrain(c, 40)));
     if (!G.list && G.phase === 'day') G.list = buildChecklist();

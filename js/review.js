@@ -14,6 +14,7 @@ function dayExtras(res) {
     vendorsIn: t.vendorsIn, spoiled: t.spoiled, tagsLeft: G.tags.length, misses: t.misses, requests: t.requests,
     labor: t.labor, trash: (G.trash || []).length, truckCases: t.truckCases,
     teamMorale: Math.round(teamMorale()), conflicts: t.conflicts || 0, conflictsIgnored: t.conflictsIgnored || 0, exits: t.exits || 0,
+    incidents: t.incidents || 0, expFound: t.expFound || 0, inspFail: t.inspection ? !t.inspection.pass : false, dmWalk: t.dmWalk ? t.dmWalk.score : null,
   };
 }
 
@@ -110,6 +111,11 @@ function buildWeekReview(week) {
     'Every person who walks out costs you weeks of training and slows the whole crew down. Unhappy people work slower, call out more and argue more. The store runs on them.',
     'Thank people for good work every day (press E next to them). Keep schedules steady. Step into arguments right away. When a strong worker asks to move up, give them an answer.');
   else if (mor != null && mor >= 75) praise.push(`Team morale is ${mor}%. People want to work for you.`);
+
+  const inc = S(d => d.incidents || 0), expF = S(d => d.expFound || 0), inspF = days.filter(d => d.inspFail).length;
+  if (inc || expF || inspF) note('Store conditions', [inc && `${inc} customer slip incident${inc > 1 ? 's' : ''}`, expF && `customers found expired dairy ${expF} time${expF > 1 ? 's' : ''}`, inspF && `${inspF} failed health inspection${inspF > 1 ? 's' : ''}`].filter(Boolean).join(', ') + '.',
+    'Safety and food quality aren\'t extra credit. One injured customer or one sick family can cost more than a month of sales, and it\'s what people remember about a store.',
+    'Do the dairy code check every morning. Clean spills the moment you see them. When a case goes down, pull the product first.');
 
   if (oosAvg != null && oosAvg > OOS_GOAL) note('Out-of-stock count', `Your nightly count averaged ${Math.round(oosAvg)} against a goal of ${OOS_GOAL}.`,
     'The count tells you how the store looks to the last customer of the night and the first one tomorrow.',

@@ -104,12 +104,29 @@ const UI = {
     const main = this['tab_' + this.tab]();
     const unread = G.emails.filter(m => !m.read).length;
     const tabs = [['today', '📋 Today'], ['dash', '📊 Reports'], ['mail', `📧 Email${unread ? ` (${unread})` : ''}`], ['crew', '👥 Crew & Schedule'], ['hire', '🤝 Hiring'],
-      ['display', '🏷️ Display Planner'], ['order', '📈 Forecast & Order'], ['records', '🏆 Records'], ['help', '❓ Help & Settings']];
+      ['display', '🏷️ Display Planner'], ['order', '📈 Forecast & Order'], ['sir', `🛒 Special Items${(G.sirs || []).some(s => s.status === 'open') ? ' (!)' : ''}`], ['records', '🏆 Records'], ['help', '❓ Help & Settings']];
     $('pc-tabs').innerHTML = tabs.map(([k, l]) => `<button class="${this.tab === k ? 'on' : ''}" onclick="UI.setTab('${k}')">${l}</button>`).join('') +
       `<div style="flex:1"></div><div class="mute" style="font-size:12px;padding:6px">The clock is paused while you're logged in.</div>`;
     $('pc-main').innerHTML = main;
   },
 
+  tab_sir() {
+    const open = (G.sirs || []).filter(s => s.status === 'open');
+    let h = `<h2>🛒 Special Item Requests</h2><p class="mute">Customers ask for items we don't carry. Each department has room for ${SKU_SLOTS} items, so to carry something new you deactivate one. Pick the slowest seller (lowest units in the last 7 days) unless the new item is a dud. Answer within 3 days: even a "no" beats silence.</p>`;
+    if (!open.length) h += '<p class="mute">No open requests right now.</p>';
+    for (const s of open) {
+      const d = DEPT[s.dept];
+      const rows = d.items.map(([n]) => [n, itemWeekUnits(n)]).sort((a, b) => a[1] - b[1]);
+      h += `<div class="card" style="margin:10px 0"><b>${esc(s.item)}</b> · ${d.name} · requested ${dayLabel(s.day)} by ${esc(s.who.toLowerCase())} · <span class="warn">answer by Day ${s.day + 3}</span>
+        <div>Vendor estimate: <b>${s.estWk} units/week</b> (estimates run ±25%)</div>
+        <div style="margin-top:6px">Deactivate: <select id="sir-drop-${s.id}">${rows.map(([n, u], i) => `<option value="${esc(n)}">${esc(n)}: ${u} units last 7 days${i === 0 ? ' (slowest)' : ''}</option>`).join('')}</select>
+        <button class="primary" onclick="approveSIR(${s.id}, document.getElementById('sir-drop-${s.id}').value); UI.render()">Approve & carry</button>
+        <button onclick="declineSIR(${s.id}); UI.render()">Decline</button></div></div>`;
+    }
+    const past = (G.sirs || []).filter(s => s.status !== 'open').slice().reverse();
+    if (past.length) h += '<h3>History</h3><table><tr><th>Item</th><th>Dept</th><th>Result</th><th class="n">Sold last 7 days</th><th>Dropped</th></tr>' + past.map(s => `<tr><td>${esc(s.item)}</td><td>${DEPT[s.dept].name}</td><td>${s.status === 'approved' ? '<span class="good">Carried</span>' : s.status === 'declined' ? 'Declined' : '<span class="bad">No answer</span>'}</td><td class="n">${s.status === 'approved' ? itemWeekUnits(s.item) : '—'}</td><td class="mute">${s.dropped ? esc(s.dropped) + ' (' + s.droppedWk + '/wk)' : ''}</td></tr>`).join('') + '</table>';
+    return h;
+  },
   tab_records() {
     const rec = G.records || {};
     let h = '<h2>🏆 Records board</h2><p class="mute">Your personal bests. Beat one and you\'ll hear about it.</p><table><tr><th>Record</th><th class="n">Best</th><th>Set on</th></tr>';
@@ -274,7 +291,7 @@ const UI = {
     const td = nextTruckDay(G.phase === 'day' ? G.day : G.day + 1), cover = coverDays(td);
     const sug = suggestedOrder();
     const cur = (G.order && G.day === td) ? G.order : sug;
-    let h = `<h2>Forecast & Order</h2>`;
+    let h = `<h2>Forecast & Order</h2>` + seasonBanner();
     h += `<p class="mute">Tonight's trucks: <b>${trucksOn(td).map(t => TRUCK_TYPES[t].name).join(', ')}</b>. Only departments on tonight's trucks can be ordered. The window closes at <b>${fmtTime(ORDER_CUTOFF)}</b>.</p>`;
     if (editable) h += `<p>Order for <b>tonight's trucks</b> (${WEEKDAY_NAMES[dowIdx(td)]}). Each department's order has to cover the days until its next truck (see Covers). ${G.orderSubmitted ? '<span class="good">✓ Submitted. You can still change and resubmit until the cutoff.</span>' : `<span class="warn">Not submitted yet. Due by ${fmtTime(ORDER_CUTOFF)}.</span>`}</p>`;
     else if (G.phase === 'day' && isTruckNight(G.day)) h += `<p class="warn">The order window closed at ${fmtTime(ORDER_CUTOFF)}. ${G.today.systemOrder ? 'The system order was sent.' : 'Your order is locked in.'}</p>`;

@@ -39,6 +39,7 @@ const TASK_CHECK = {
   coach: a => (G.today.coached || 0) >= a.n,
   noOuts: a => !(G.today.lost[a.dept] > 0),
   clean: () => !(G.trash || []).length,
+  codes: a => !codesNeedWork(a.dept),
 };
 
 function buildChecklist() {
@@ -46,6 +47,7 @@ function buildChecklist() {
   const add = (id, kind, label, sub, due, mode, arg) => L.push({ id, kind, label, sub: sub || '', due, mode, arg: arg || {}, status: 'open' });
   add('water', 'shelf', 'Water pallets run (Aisle 2 beverage)', 'Shelf 90% full before doors open', OPEN, 'by', { dept: 'A2', pct: 0.9 });
   add('paper', 'shelf', 'Paper pallets run (Aisle 4 paper)', 'Shelf 90% full before doors open', OPEN, 'by', { dept: 'A4', pct: 0.9 });
+  add('codes', 'codes', 'Dairy code check', 'Pull expired, mark down short-dated, rotate oldest to the front (E at the dairy shelf)', 600, 'by', { dept: 'DAI' });
   (BACKSTOCK_RUNS[dow] || []).forEach(d => add('bs-' + d, 'backstock', `Backstock run: ${DEPT[d].aisle} birds`, 'Work backstock to the shelf by noon', 720, 'by', { dept: d }));
   const trucks = lastNightTrucks();
   add('invoices', 'invoices', `Invoices closed: ${trucks.join(', ')} + DSD`, 'Office computer → Today. A truck closes once its freight is worked', 1370, 'by');

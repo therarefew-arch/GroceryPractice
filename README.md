@@ -1,6 +1,6 @@
 # Grocery Practice
 
-**Version 0.0.7**
+**Version 0.0.8**
 
 A 2D grocery store manager simulator for practicing the real job: receiving the night truck, building floats, working freight, keeping the shelves full, running the crew, and ordering for tomorrow. All without blowing the labor budget.
 
@@ -47,6 +47,14 @@ It's plain HTML/JavaScript, so there's no build step.
 
 **Promotions:** Pros and Superstars with 5+ days can be promoted to ◆ Lead (+$1.50/hr, max 2). Leads work faster, lift morale on their shift and calm arguments. Strong workers will ask to move up; answer within 3 days or they feel passed over.
 
+**Special Item Requests:** customers ask for items you don't carry (email + 🛒 Special Items tab). Each department has room for 8 items, so carrying one means deactivating one: check the 7-day sales and drop the slowest. Answer within 3 days or the customer is upset.
+
+**Dated dairy:** dairy ages on the shelf, and over-ordering makes it age faster. Do the code check every morning (E at the dairy shelf; it's on the daily list by 10 AM): pull expired product, mark down short-dated (sells first at 50% off) and rotate the oldest to the front. Customers who find expired product complain. A Dairy Clerk on shift does the check at 9 AM and 3 PM.
+
+**Store events:** spills (clean within 30 minutes or a customer slips), cooler breakdowns (pull the product to the backroom cooler and call maintenance, or it spoils every hour), announced DM store walks and unannounced health inspections. Every finding comes with the why.
+
+**Seasons:** every other week brings a seasonal event (Summer Cookout, Back to School, Big Game Weekend, Thanksgiving, Holiday Season) that lifts certain departments. The DM warns you the Monday before, and the suggested order does NOT include it, so adjust your orders yourself.
+
 **Weekly DM review:** after Friday's close (weeks run Saturday to Friday) your District Manager grades the week. He is harsh but fair: for every problem he tells you what he saw, why it matters and what to do next week. Reviews also land in your email and on the Records tab.
 
 **Records board:** Office computer → 🏆 Records tracks your personal bests (best score, top sales, fastest truck, lowest labor %, best in-stock, lowest OOS count, longest B-or-better streak, most coaching in a day).
@@ -68,6 +76,7 @@ Everything store-specific lives in [`js/data.js`](js/data.js): departments/aisle
 | `js/training.js` | Crew mistakes, coaching, ranks, mentoring, cardboard trash |
 | `js/fx.js` | Sound effects, combos, confetti, minimap, worker hover info |
 | `js/morale.js` | Morale, conflicts, promotions, notice and exit interviews |
+| `js/events.js` | Special Item Requests, dated dairy, spills, coolers, DM walks, inspections, seasons |
 | `js/review.js` | Weekly DM review, records board, gamepad |
 | `js/ui.js` | HUD, office computer, modals |
 
