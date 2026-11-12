@@ -414,6 +414,7 @@ function drawCrew(c, r) {
   const top = pixelPerson(r, role.color, { seed: hash(c.name), vest: 'rgba(0,0,0,0.25)', ring: star ? '#ffd34d' : null });
   const first = (c.lead ? '◆ ' : '') + c.name.split(' ')[0].toUpperCase();
   nameplate(ctx, star ? '★ ' + first : first, r.x * T, top - 9, star ? { font: PX(8), h: 12, edge: '#ffd34d', color: '#ffe9a0', bg: '#2a2208' } : { font: PX(8), h: 12, edge: role.color });
+  if (c.order) label(ctx, '📌', r.x * T + 13, top - 9, { font: PX(8) });
   if (G.conflict && (G.conflict.a === c.id || G.conflict.b === c.id)) drawArgueBubble(r, top);
   else if (c.needsCoach) drawCoachBubble(r, top);
   if (r.carry.length) drawCarry(r.x, r.y - 0.1, r.carry.slice(0, 4));

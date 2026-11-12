@@ -1,6 +1,6 @@
 # Grocery Practice
 
-**Version 0.0.13**
+**Version 0.0.14**
 
 A 2D grocery store manager simulator for practicing the real job: receiving the night truck, building floats, working freight, keeping the shelves full, running the crew, and ordering for tomorrow. All without blowing the labor budget.
 
@@ -63,6 +63,8 @@ It's plain HTML/JavaScript, so there's no build step.
 
 **On your phone:** open https://therarefew-arch.github.io/GroceryPractice/ and turn the phone sideways. On touch screens you get a joystick (left), a big **E** button, **RUN** (tap to toggle), zoom, pause and full screen. You can also tap the yellow action text at the bottom, and tap a crew member to see their card. To install it like an app: iPhone, Safari → Share → Add to Home Screen; Android, Chrome → ⋮ → Add to Home screen / Install app. It works offline after the first load. Your phone keeps its own save. Add `?touch=1` to the URL to force the touch controls on (or `?touch=0` to turn them off).
 
+**Crew orders (micromanage):** click (or tap) an associate on the map, or use 📌 Orders in the Crew tab, and tell them exactly what to do: work the truck, break down pallets, unload the trailer, get one department's freight out, fill holes in a department, face an aisle, watch the back door for DSD, hang price tags, pick up cardboard or do backroom upkeep. They drop what they're doing, work the order until it's done or about 2 hours pass, then go back to their job. Orders outside their job (dashed buttons) work 15% slower unless they're a Lead or Superstar. More than 4 orders to one person in a day starts to cost morale: they want to finish something.
+
 **Weekly DM review:** after Friday's close (weeks run Saturday to Friday) your District Manager grades the week. He is harsh but fair: for every problem he tells you what he saw, why it matters and what to do next week. Reviews also land in your email and on the Records tab.
 
 **Records board:** Office computer → 🏆 Records tracks your personal bests (best score, top sales, fastest truck, lowest labor %, best in-stock, lowest OOS count, longest B-or-better streak, most coaching in a day).
@@ -89,6 +91,7 @@ Everything store-specific lives in [`js/data.js`](js/data.js): departments/aisle
 | `js/backroom.js` | Empty pallets, baler & bales, reload staging, truck stop order, sweeping, crooked floats, bird overflow |
 | `js/layout.js` | Backroom layout: movable float spots, reload staging and baler, validation, walk distances |
 | `js/touch.js` | Phone/tablet joystick and buttons, home-screen app (with `sw.js`, `manifest.webmanifest`, `icons/`) |
+| `js/orders.js` | Crew orders: click/tap an associate to assign any task, even outside their job |
 | `js/review.js` | Weekly DM review, records board, gamepad |
 | `js/ui.js` | HUD, office computer, modals |
 

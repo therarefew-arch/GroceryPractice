@@ -176,10 +176,12 @@ function drawCrewTooltip() {
     const v = Math.round(c.train[k]);
     lines.push({ t: TRAIN_AREAS[k].name, bar: v, f: TIP_S, col: v >= 85 ? '#ffd34d' : v >= 50 ? '#57f287' : '#ff9f6b' });
   }
+  if (c.order) lines.push({ t: `📌 Your order: ${orderLabel(c.order)} (until ${fmtTime(c.order.until)})${c.order.ooc ? ' · outside their job' : ''}`, f: TIP, col: '#ffd34d' });
   if (c.needsCoach) lines.push({ t: `⚠ Needs coaching: ${TRAIN_AREAS[c.needsCoach.area].mistake}`, f: TIP, col: '#ff5a4e' });
   const sh = SHIFTS[curShift(c)];
   lines.push({ t: `${sh ? sh.name : 'Off today'} · Skill ${'★'.repeat(c.skill)}${'☆'.repeat(5 - c.skill)} · $${(+c.wage || 0).toFixed(2)}/hr`, f: TIP_S, col: '#b08a52' });
 
+  lines.push({ t: TOUCH ? 'Tap for orders' : 'Click to give orders', f: TIP_S, col: '#42d7ff' });
   let w = 0;
   const BAR_X = 130, BAR_W = 90;
   lines.forEach(l => { ctx.font = l.f; w = Math.max(w, l.bar != null ? BAR_X + BAR_W + 40 : ctx.measureText(l.t).width); });

@@ -215,7 +215,7 @@ const UI = {
         <td><select onchange="UI.setRole(${c.id},this.value)">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${k === c.role ? 'selected' : ''}>${v.name}</option>`).join('')}</select></td>
         <td><select onchange="UI.setShift(${c.id},this.value)">${Object.entries(SHIFTS).map(([k, v]) => `<option value="${k}" ${k === c.shift ? 'selected' : ''}>${v.name}</option>`).join('')}</select></td>
         <td>${stars(c.skill)}</td><td>${rankHTML(c)}</td><td>${trainMeter(c)}</td><td title="${TRAITS[ensureMorale(c).trait].desc}" style="white-space:nowrap">${moodOf(c).icon} ${Math.round(c.morale)}% <span class="mute">${TRAITS[c.trait].name}</span>${c.strikes ? ` <span class="warn">${c.strikes}✎</span>` : ''}</td><td class="n">${c.coached || 0}</td><td class="n">${c.days || 0}</td><td class="n">$${c.wage.toFixed(2)}/hr</td><td>${status}${c.needsCoach ? ' <span class="bad">⚠ needs coaching</span>' : ''}${c.notice ? ` <span class="bad">🚪 gave notice (last day ${c.notice})</span>` : ''}${c.promoAsk ? ' <span class="warn">📈 asked to move up</span>' : ''}${c.sentHome === G.day ? ' <span class="mute">sent home</span>' : ''}</td>
-        <td style="white-space:nowrap">${c.lead ? '<span class="good">◆ Lead</span> ' : canPromote(c) ? `<button onclick="UI.promote(${c.id})">Promote</button> ` : ''}<button class="danger" onclick="UI.fire(${c.id})">Fire</button></td></tr>`;
+        <td style="white-space:nowrap">${c.lead ? '<span class="good">◆ Lead</span> ' : canPromote(c) ? `<button onclick="UI.promote(${c.id})">Promote</button> ` : ''}<button onclick="showOrders(G.crew.find(x => x.id === ${c.id}))">📌 Orders</button> <button class="danger" onclick="UI.fire(${c.id})">Fire</button></td></tr>`;
     }
     h += '</table>';
     const tdy = G.crew.map(c => [c, curShift(c)]).filter(([c, k]) => k && !c.calledOut);
@@ -229,6 +229,7 @@ const UI = {
     h += `<h3>Roles</h3><table>${Object.values(ROLES).map(r => `<tr><td style="white-space:nowrap"><span class="dot" style="background:${r.color}"></span><b>${r.name}</b></td><td class="mute">${r.desc}</td></tr>`).join('')}</table>`;
     return h;
   },
+  order(id, kind, dept) { const c = G.crew.find(x => x.id === id); if (!c) return; if (kind) giveOrder(c, kind, dept); else clearOrder(c, 'was taken off'); this.hideModal(); if (this.open) this.render(); },
   promote(id) { const c = G.crew.find(x => x.id === id); if (c) promoteCrew(c); this.render(); },
   showConflict() {
     const k = G.conflict; if (!k) return;

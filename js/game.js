@@ -8,7 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1380, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.13'; // bump the last number on every update
+const VERSION = '0.0.14'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -635,7 +635,7 @@ function rt(c) {
     carry: [], floatId: null, pallet: null, cleanups: [], progress: 0, label: '', intent: '',
   });
 }
-const sf = c => (0.7 + 0.12 * c.skill) * (isStar(c) ? 1.15 : 1) * moraleSpeed(c);
+const sf = c => (0.7 + 0.12 * c.skill) * (isStar(c) ? 1.15 : 1) * moraleSpeed(c) * orderSpeed(c);
 function onShift(c) {
   if (c.calledOut || c.sentHome === G.day) return false;
   const sk = curShift(c); if (!sk) return false;
@@ -925,7 +925,7 @@ function updateCrew(dt, gm) {
     if (!r.plan) {
       if (!on) { r.intent = 'Clocking out'; r.plan = [{ go: () => [MAPD.staffDoor] }, { do: () => { r.inBuilding = false; return true; } }]; }
       else if (G.phase === 'day' && rollMistake(c, 'focus', 0.025)) { r.plan = [{ wait: 6, label: 'On their phone' }]; r.intent = 'On their phone 📱'; }
-      else r.plan = brain(c, r) || planIdle(c, r);
+      else r.plan = orderPlan(c, r) || brain(c, r) || planIdle(c, r);
     }
     runPlan(c, r, dt);
     if (r.floatId) { const f = floatById(r.floatId); if (f) { f.x = r.x + r.fx * 0.6; f.y = r.y + r.fy * 0.6; } }
