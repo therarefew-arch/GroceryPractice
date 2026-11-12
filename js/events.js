@@ -218,6 +218,7 @@ function conditionsCheck() {
   return {
     shelves, trash: (G.trash || []).length, tags: G.tags.length, spills: (G.spills || []).length,
     exp: sum(CODE_DEPTS.map(d => codes(d).exp)), cooler: G.cooler && !G.cooler.pulled ? G.cooler.dept : null, coldOut,
+    ...backroomCheck(),
   };
 }
 function dmWalk() {
@@ -231,6 +232,10 @@ function dmWalk() {
   if (c.cooler) hit(20, `The ${DEPT[c.cooler].name} case is down and the product is still in it. Pull product first, then call maintenance.`);
   if (c.trash) hit(Math.min(15, c.trash * 4), `${c.trash} pieces of cardboard in the aisles. Pick it up as you go, and make your crew do the same.`);
   if (c.tags > 4) hit(10, `${c.tags} price tags still need to be hung or fixed. Wrong prices cost money at the register and trust with customers.`);
+  if (c.birds.length) hit(Math.min(20, c.birds.length * 10), `Backstock birds are sitting on the sales floor in ${c.birds.map(d => DEPT[d].aisle).join(', ')}. That's a wall in front of the customer, and it tells me we ordered more than we can hold.`);
+  if (c.dirt > 50) hit(10, 'The backroom is filthy. Your crew works in there all day; it says what you tolerate.');
+  if (c.empties > 5) hit(5, `${c.empties} empty pallets are sitting in receiving. Where does tomorrow's truck go?`);
+  if (c.crooked > 2) hit(5, `${c.crooked} floats are crooked or out of place. Float staging should be square: it's faster and safer.`);
   if (G.conflict) hit(10, `Two of your people were arguing on the floor while I was here. Deal with it in the back, not in front of customers.`);
   score = Math.max(0, score);
   const grade = score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
@@ -246,6 +251,8 @@ function inspection() {
   if (c.cooler) v.push(['Product out of temperature', `${DEPT[c.cooler].name} still in a broken case.`, 'Cold food above 41°F grows bacteria fast. Move it to the backroom cooler the moment a case goes down.']);
   if (c.coldOut > 6) v.push(['Cold product sitting out', `${c.coldOut} cold cases on pallets/floats outside the cooler.`, 'Dairy and frozen should go straight into the cooler or onto the shelf. Work cold first.']);
   if (c.spills) v.push(['Slip hazard', 'An uncleaned spill on the sales floor.', 'Spills must be blocked off and cleaned immediately.']);
+  if (c.dirt > 60) v.push(['Unsanitary backroom', `The backroom floor is dirty (${Math.round(c.dirt)}%).`, 'Debris and spilled product attract pests. Sweep mid-day and at close, every day.']);
+  if (c.birds.length) v.push(['Blocked aisle', `Backstock parked in ${c.birds.map(d => DEPT[d].aisle).join(', ')}.`, 'Aisles must stay clear for customers and for an emergency exit.']);
   if (c.trash > 3) v.push(['Housekeeping', `${c.trash} pieces of cardboard on the floor.`, 'Clutter hides hazards and attracts pests. Clean as you go.']);
   const pass = v.length === 0, score = Math.max(0, 100 - v.length * 15 - (c.exp ? 10 : 0));
   G.today.inspection = { pass, score };

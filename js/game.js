@@ -8,7 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1380, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.9'; // bump the last number on every update
+const VERSION = '0.0.10'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -72,7 +72,7 @@ const maxCrew = () => 3 + level();
 
 function palletCases(dept) { let n = 0; for (const p of G.pallets) for (const c of p.cases) if (c.d === dept) n++; return n; }
 function truckRemaining() { return sum(G.pallets.map(p => p.cases.length)) + sum(G.floats.map(f => f.cases.length)); }
-function removeEmptyPallets() { G.pallets = G.pallets.filter(p => p.cases.length); }
+function removeEmptyPallets() { G.pallets = G.pallets.filter(p => { if (p.cases.length) return true; palletEmptied(p); return false; }); }
 
 function stockUnits(dept, u) {
   const s = G.stock[dept], d = DEPT[dept];
@@ -132,7 +132,8 @@ function buildTruck(order) {
   return pallets;
 }
 function freeRecvSpot(near) {
-  const spots = MAPD.recvSpots.filter(s => !s.reserved && !G.pallets.some(p => Math.abs(p.x - s.x - 0.5) < 0.6 && Math.abs(p.y - s.y - 0.5) < 0.6));
+  const taken = G.pallets.concat(G.empties || []);
+  const spots = MAPD.recvSpots.filter(s => !s.reserved && !taken.some(p => Math.abs(p.x - s.x - 0.5) < 0.6 && Math.abs(p.y - s.y - 0.5) < 0.6));
   if (!spots.length) return null;
   if (near) spots.sort((a, b) => Math.hypot(a.x + 0.5 - near.x, a.y + 0.5 - near.y) - Math.hypot(b.x + 0.5 - near.x, b.y + 0.5 - near.y));
   return spots[0];
@@ -210,6 +211,7 @@ function newGame() {
   G.crew.push({ id: nid(), name: 'Devon P.', role: 'freight', shift: 'truck6', skill: 3, wage: 16.25, calledOut: false });
   G.crew.forEach(c => ensureMorale(ensureTrain(c, 40)));
   G.trash = [];
+  ensureBackroom();
   buildTruck(suggestedOrder()).forEach(p => placePallet(p));
   RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {};
   mail('Store Training', 'Welcome to your store!', [
@@ -267,6 +269,7 @@ function startDay() {
     mail('District Manager', 'New ad is live', `Today's ad features ${G.ad.depts.map(d => DEPT[d].name).join(' & ')}. Verify every ad endcap is up and full by noon.`);
   }
   eventsStartDay();
+  backroomStartDay();
   G.list = buildChecklist();
   const nt = nextTruckDay(G.day);
   mail('District Manager', `${WEEKDAY_NAMES[dowIdx(G.day)]} game plan (${dayLabel(G.day)})`, [
@@ -278,6 +281,7 @@ function startDay() {
     `  • Labor: ${LABOR_TARGET}% of sales or less`,
     `  • Truck: ${G.today.truckCases} cases — have it worked by noon`,
     `  • Price changes: ${G.tags.length} tags to hang`,
+    `  • Reloads: ${stopText()} (${reloadUsed()}/${RELOAD_SLOTS} slots staged)`,
     `  • DSD today: ${VENDORS.map(v => `${fmtTime(v.time)} ${v.name}`).join(', ')}`,
     '',
     'Cold freight first. Let\'s have a great day.',
@@ -299,7 +303,7 @@ function endDay() {
   G.crew.forEach(despawnCrew);
   tenureDay();
   const res = computeResults();
-  res.tips.push(...moraleDay(res), ...eventsTips());
+  res.tips.push(...moraleDay(res), ...eventsTips(), ...backroomTips());
   DEPTS.forEach(d => {
     G.history[d.id].push(t.demand[d.id] || 0);
     if (G.history[d.id].length > 14) G.history[d.id].shift();
@@ -308,7 +312,7 @@ function endDay() {
   res.badges.forEach(b => { G.badges[b] = (G.badges[b] || 0) + 1; });
   G.bank += res.bonus;
   addXP(res.xp);
-  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res), ...laborDayExtras() });
+  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res), ...laborDayExtras(), ...backroomDayExtras() });
   if (G.pastDays.length > 30) G.pastDays.shift();
   updateRecords(G.pastDays[G.pastDays.length - 1]);
   if (dowOf(G.day) === 'Fri') {
@@ -400,6 +404,7 @@ function endNight() {
     toast(`Overtime crew unloaded ${n} pallet${n > 1 ? 's' : ''} (+${money(cost)} labor).`, 'warn');
   }
   MAPD.recvSpots.forEach(s => { s.reserved = null; });
+  reloadsEndNight();
   G.day++;
   startDay();
 }
@@ -407,8 +412,8 @@ function endNight() {
 function confirmEndNight() {
   if (G.phase !== 'night') return;
   const n = G.trailer.length;
-  if (n && !confirm(`${n} pallet${n > 1 ? 's are' : ' is'} still on the trailer. An overtime crew will unload ${n > 1 ? 'them' : 'it'} for ${money(n * OT_PER_PALLET)} of labor (counts against tomorrow). End the night?`)) return;
-  endNight();
+  if (!n) return endNight();
+  UI.ask('End the night?', `${n} pallet${n > 1 ? 's are' : ' is'} still on the trailer. An overtime crew will unload ${n > 1 ? 'them' : 'it'} for ${money(n * OT_PER_PALLET)} of labor (counts against tomorrow).`, 'End the night', () => { if (G.phase === 'night') endNight(); });
 }
 
 // =====================================================================
@@ -462,7 +467,7 @@ function orderWindowTick(prev) {
 
 function onHour(h) {
   if (h >= 9 && h <= 21) spoilCheck();
-  mentorHour(); trashHour(); moraleHour(); eventsHour(h);
+  mentorHour(); trashHour(); moraleHour(); eventsHour(h); backroomHour();
   if (h === 13 && G.sat < 55) mail('Customer Service Desk', 'Complaints are piling up', 'We\'re getting a lot of complaints about empty shelves and wrong prices today. Can someone check the floor?');
   if (h === 16) toast('🛒 Rush hour is coming (4–7 PM). Top off the fast movers now!', 'warn');
   if (h % 2 === 0) save();
@@ -646,6 +651,7 @@ function finishPlan(c, r) {
     r.floatId = null;
   }
   if (r.carry.length) { r.carry.forEach(cs => { G.stock[cs.d].back += caseUnits(cs); }); r.carry = []; }
+  if (r.pallet && r.pallet.empty) { G.empties.push({ id: r.pallet.id, x: r.x, y: r.y }); r.pallet = null; }
   if (r.pallet) {
     if (G.phase === 'night') G.trailer.unshift(r.pallet); else placePallet(r.pallet, freeRecvSpot(r));
     r.pallet = null;
@@ -701,6 +707,7 @@ function goEnt(getter) {
 function takeCases(p, dept, n) {
   const out = [];
   for (let i = p.cases.length - 1; i >= 0 && out.length < n; i--) if (p.cases[i].d === dept) out.push(p.cases.splice(i, 1)[0]);
+  cardboard(out.length);
   if (!p.cases.length) removeEmptyPallets();
   return out;
 }
@@ -731,7 +738,7 @@ function planBreakdown(c, r, only) {
     { wait: 0.9, label: 'Breaking down' },
     { do: () => { const taken = takeCases(p, dept, n); if (!taken.length) return false; r.carry = taken; return true; } },
     goEnt(() => f),
-    { wait: 0.4, label: 'Building float' },
+    { wait: f.crooked ? 1.0 : 0.4, label: f.crooked ? 'Building float (crooked, slow)' : 'Building float' },
     { do: () => {
       if ((f.claimedBy && f.claimedBy !== c.id) || dist(r, f) > 2.5) return false;
       if (r.carry.length && rollMistake(c, 'sort', 0.22)) {
@@ -773,7 +780,7 @@ function planFreight(c, r, only, readyMin) {
     { do: () => { if (rollMistake(c, 'stock', 0.12)) dropTrash(r); return true; } },
     { do: () => (f.cases.length ? [{ go: () => [rackAccess(dept)] }, { wait: 1.2, label: 'Backstocking overflow' }, { do: () => { floatToBack(f); return true; } }] : true) },
     { go: () => tilesAround({ x: f.homeX, y: f.homeY }, 1).filter(tl => !(tl.x === Math.floor(f.homeX) && tl.y === Math.floor(f.homeY))) },
-    { do: () => { f.carriedBy = null; r.floatId = null; f.x = f.homeX; f.y = f.homeY; f.claimedBy = null; return true; } },
+    { do: () => { f.carriedBy = null; r.floatId = null; f.x = f.homeX; f.y = f.homeY; f.claimedBy = null; knockFloat(f, c); return true; } },
   ];
 }
 
@@ -881,12 +888,12 @@ function planIdle(c, r) {
 function brain(c, r) {
   const role = ROLES[c.role];
   switch (c.role) {
-    case 'breakdown': return planBreakdown(c, r) || planFreight(c, r, null, 30) || planReplen(c, r, null, 0.5);
+    case 'breakdown': return (backroomUrgent() ? planBackroom(c, r) : null) || planBreakdown(c, r) || planBackroom(c, r) || planFreight(c, r, null, 30) || planReplen(c, r, null, 0.5);
     case 'freight': return planFreight(c, r, null, 20) || planReplen(c, r, null, 0.6) || planBreakdown(c, r);
     case 'replen': return planReplen(c, r, null, 0.75) || planFreight(c, r, null, 25);
     case 'dsd': return planDSD(c, r) || planReplen(c, r, null, 0.6);
     case 'price': return planPrice(c, r) || planReplen(c, r, null, 0.5);
-    case 'unloader': return planUnload(c, r) || planBreakdown(c, r) || planFreight(c, r, null, 20);
+    case 'unloader': return planUnload(c, r) || (backroomUrgent() ? planBackroom(c, r) : null) || planBreakdown(c, r) || planBackroom(c, r) || planFreight(c, r, null, 20);
     default: {
       const D = [role.dept];
       return planReplen(c, r, D, 0.85) || planFreight(c, r, D, 6) || planBreakdown(c, r, D) || planFace(c, r, role.dept);
@@ -980,6 +987,7 @@ function startWork(dur, label, done, repeat) { G.player.work = { t: 0, dur, labe
 function getInteraction() {
   const p = G.player;
   if (G.phase !== 'day' && G.phase !== 'night') return null;
+  if (p.pallet && p.pallet.empty) return backroomInteraction(p);
   const shelf = nearestTile(p, ch => !!SHELF_DEPT[ch], 1.3);
   const shelfDept = shelf ? SHELF_DEPT[shelf.ch] : null;
   const rack = nearestTile(p, ch => ch === 'b', 1.35);
@@ -1021,6 +1029,8 @@ function getInteraction() {
   if (G.phase === 'night' && G.trailer.length && p.y < 4.4 && p.x > 1.5 && p.x < 6.5) {
     return { label: `Pull a pallet off the trailer (${G.trailer.length} left)`, fn: () => startWork(1, 'Jacking pallet', () => { const pl = G.trailer.shift(); if (pl) G.player.pallet = pl; }) };
   }
+  const br = !p.work && backroomInteraction(p);
+  if (br) return br;
   const tag = G.tags.find(t => Math.hypot(t.x + 0.5 - p.x, t.y + 0.5 - p.y) < 1.5);
   if (tag) return { label: tag.kind === 'error' ? 'Fix scan error (shelf price ≠ register)' : 'Hang price change tag', fn: () => startWork(1.5, tag.kind === 'error' ? 'Fixing scan error' : 'Hanging tag', () => { if (G.tags.includes(tag)) fixTag(tag, true); }) };
   if (pal) return { label: `Pick up a case (${pal.cases.length} on pallet)`, fn: () => playerPick(pal) };
@@ -1032,6 +1042,8 @@ function getInteraction() {
   const ev2 = !p.work && eventsInteraction(p, shelfDept, false);
   if (ev2) return ev2;
   const mi = !p.work && moraleInteraction(p);
+  const sw = !p.work && !mi && backroomInteraction(p, true);
+  if (sw) return sw;
   if (mi) return mi;
   if (shelfDept) return { label: `${DEPT[shelfDept].aisle} · ${DEPT[shelfDept].name}: shelf ${Math.round(shelfPct(shelfDept) * 100)}% full`, fn: null };
   return null;
@@ -1040,6 +1052,7 @@ function getInteraction() {
 function playerPick(pal) {
   const c = pal.cases.pop();
   G.player.carry.push(c);
+  cardboard(1);
   if (!pal.cases.length) removeEmptyPallets();
   floater(G.player.x, G.player.y - 0.9, caseLabel(c), DEPT[c.d].color);
   SFX.pick();
@@ -1113,7 +1126,8 @@ function save() {
       const r = RT.crew[c.id];
       if (!r) continue;
       r.carry.forEach(cs => { s.stock[cs.d].back += caseUnits(cs); });
-      if (r.pallet) { if (s.phase === 'night') s.trailer.unshift(r.pallet); else s.pallets.push({ ...r.pallet, x: r.x, y: r.y }); }
+      if (r.pallet && r.pallet.empty) s.empties.push({ id: r.pallet.id, x: r.x, y: r.y });
+      else if (r.pallet) { if (s.phase === 'night') s.trailer.unshift(r.pallet); else s.pallets.push({ ...r.pallet, x: r.x, y: r.y }); }
     }
     s.floats.forEach(f => { if (f.carriedBy !== 'player') f.carriedBy = null; f.claimedBy = null; f.incoming = 0; });
     s.tags.forEach(t => { t.claimedBy = null; });
@@ -1136,6 +1150,7 @@ function load() {
     G.trash = G.trash || [];
     G.crew.forEach(c => ensureMorale(ensureTrain(c, 40)));
     ensureLabor();
+    ensureBackroom();
     if (!G.list && G.phase === 'day') G.list = buildChecklist();
     RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {};
     G.vendorsToday.forEach(v => {

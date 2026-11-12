@@ -50,6 +50,7 @@ function buildMap() {
       if (walkable(nx, ny) && !acc.some(a => a.x === nx && a.y === ny)) acc.push({ x: nx, y: ny });
     }
   }
+  if (typeof setupBackroom === 'function') setupBackroom();
   for (let y = 3; y <= 9; y++) for (let x = 9; x <= 24; x++) if (walkable(x, y)) MAPD.backroomTiles.push({ x, y });
 }
 

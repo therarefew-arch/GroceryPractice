@@ -502,10 +502,10 @@ function render() {
   ctx.fillStyle = PAL.void; ctx.fillRect(0, 0, canvas.width, canvas.height);
   applyCamera();
   ctx.drawImage(BG, 0, 0);
-  drawShelves(); drawRacks(); drawEndcaps(); drawTags(); drawTrash(); drawEvents();
+  drawShelves(); drawRacks(); drawEndcaps(); drawTags(); drawTrash(); drawEvents(); drawBackroom();
   if (G.phase === 'night') drawTrailer();
   G.pallets.forEach(p => drawPallet(p));
-  G.floats.forEach(drawFloat);
+  G.floats.forEach(drawFloatMaybeCrooked);
   RT.customers.forEach(drawCustomer);
   Object.values(RT.vendorNpcs).forEach(drawVendor);
   G.crew.forEach(c => { const r = RT.crew[c.id]; if (r && r.inBuilding) drawCrew(c, r); });

@@ -336,10 +336,12 @@ const UI = {
   },
   fire(id) {
     const c = G.crew.find(x => x.id === id);
-    if (!confirm(`Let ${c.name} go? This can't be undone.\nWrite-ups on file: ${c.strikes || 0}. Firing without documentation hurts team morale.`)) return;
-    letGo(c, 'fired');
-    toast(`${c.name} was let go.`);
-    this.render();
+    this.ask(`Let ${c.name} go?`, `This can't be undone. Write-ups on file: ${c.strikes || 0}. Firing without documentation hurts team morale.`, 'Let them go', () => {
+      if (!G.crew.includes(c)) return;
+      letGo(c, 'fired');
+      toast(`${c.name} was let go.`);
+      if (this.open) this.render();
+    }, true);
   },
 
   tab_hire() {
@@ -473,8 +475,15 @@ const UI = {
     this.showModal(`<h2>Welcome back</h2><p>${dayLabel(G.day)} · Level ${level()} ${title()} · Career bonus ${money(G.bank)}</p>
       <div class="row" style="justify-content:flex-end"><button class="danger" onclick="UI.newGameConfirm()">Start over</button><button class="primary" onclick="UI.hideModal(); if (G.phase === 'summary') UI.showSummary(G.lastResult);">Continue</button></div>`);
   },
+  // In-game yes/no box (the browser's confirm() pop-up is blocked in some embedded browsers).
+  ask(title, body, yes, onYes, danger) {
+    this._askYes = onYes;
+    this.showModal(`<h2>${esc(title)}</h2><p>${esc(body)}</p><div class="row" style="justify-content:flex-end;margin-top:12px"><button onclick="UI.hideModal()">Cancel</button><button class="${danger ? 'danger' : 'primary'}" onclick="UI.hideModal(); const f = UI._askYes; UI._askYes = null; if (f) f();">${esc(yes)}</button></div>`);
+  },
   newGameConfirm() {
-    if (!confirm('Start a brand-new store? Your saved progress will be erased.')) return;
+    this.ask('Start a brand-new store?', 'Your saved progress will be erased. This can\'t be undone.', 'Start over', () => this.newGameNow(), true);
+  },
+  newGameNow() {
     try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
     this.closeComputer();
     newGame();

@@ -1,6 +1,6 @@
 # Grocery Practice
 
-**Version 0.0.9**
+**Version 0.0.10**
 
 A 2D grocery store manager simulator for practicing the real job: receiving the night truck, building floats, working freight, keeping the shelves full, running the crew, and ordering for tomorrow. All without blowing the labor budget.
 
@@ -57,6 +57,8 @@ It's plain HTML/JavaScript, so there's no build step.
 
 **Labor (Monday forecast, schedule, Labor Demand Exception):** every Monday, forecast next week's sales by day before 5 PM (Office computer → 📑 Labor). The system forecast doesn't know about seasons or the ad, so adjust it. Your forecast earns next week's labor demand: truck cases, sales, DSD vendors, price tags and the ad flip, by role. Write next week's schedule day by day in 🗓 Schedule and post it by Thursday 5 PM; changes after posting cost morale. Everyone works 5 days by default; over 40 paid hours is overtime (1.5x). The Labor Demand Exception report shows demand vs scheduled hours by role and day (GR-Dairy, GR-DSD Receiving, GR-Frozen, GR-HV-LV-DSD, GR-HV-LV-DSD-RPLN, GR-Liquor, GR-Scan Price, then weekly-only roles), with exceptions in bold. The DM grades your forecast accuracy and your schedule against demand.
 
+**Backroom upkeep:** every broken-down pallet leaves an empty on its receiving spot: jack it (E) and stack it in RELOAD STAGING (bottom-left, 8 slots, 15 empties a stack). Every case leaves cardboard in the baler; when it's full, make a bale (E at the baler) or cardboard ends up on the floor. Trucks take reloads at night only if they have room: last stop on the route takes everything, a middle stop takes a little, the first stop takes nothing (the morning email tells you tonight's stops). Load reloads at the dock after the trailer is empty; a Night Unloader does it for you. Sweep the backroom mid-day and after 9 PM. Straighten crooked floats (they slow the breakdown). Each aisle's bird holds 14 cases of backstock; past that it overflows onto the sales floor, blocks the aisle and costs satisfaction every hour. Breakdown and Night Unloader crew stack empties, bale and sweep when they have nothing better to do.
+
 **Weekly DM review:** after Friday's close (weeks run Saturday to Friday) your District Manager grades the week. He is harsh but fair: for every problem he tells you what he saw, why it matters and what to do next week. Reviews also land in your email and on the Records tab.
 
 **Records board:** Office computer → 🏆 Records tracks your personal bests (best score, top sales, fastest truck, lowest labor %, best in-stock, lowest OOS count, longest B-or-better streak, most coaching in a day).
@@ -80,6 +82,7 @@ Everything store-specific lives in [`js/data.js`](js/data.js): departments/aisle
 | `js/morale.js` | Morale, conflicts, promotions, notice and exit interviews |
 | `js/events.js` | Special Item Requests, dated dairy, spills, coolers, DM walks, inspections, seasons |
 | `js/labor.js` | Weekly schedules, overtime, Monday forecast, labor demand, Labor Demand Exception report |
+| `js/backroom.js` | Empty pallets, baler & bales, reload staging, truck stop order, sweeping, crooked floats, bird overflow |
 | `js/review.js` | Weekly DM review, records board, gamepad |
 | `js/ui.js` | HUD, office computer, modals |
 
