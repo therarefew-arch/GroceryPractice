@@ -171,6 +171,7 @@ function drawCrewTooltip() {
   ensureTrain(c);
   const rk = crewRank(c);
   lines.push({ t: `${rk.icon} ${rk.name} · ${Math.round(trainAvg(c))}% trained · coached ${c.coached}x · ${c.days} days`, f: TIP_S, col: rk.color });
+  { const md = moodOf(c); lines.push({ t: `${md.icon} Morale ${Math.round(c.morale)}% (${md.name}) · ${TRAITS[c.trait].name}${c.lead ? ' · ◆ Lead' : ''}${c.notice ? ' · GAVE NOTICE' : ''}`, f: TIP_S, col: md.col }); }
   for (const k in TRAIN_AREAS) {
     const v = Math.round(c.train[k]);
     lines.push({ t: TRAIN_AREAS[k].name, bar: v, f: TIP_S, col: v >= 85 ? '#ffd34d' : v >= 50 ? '#57f287' : '#ff9f6b' });

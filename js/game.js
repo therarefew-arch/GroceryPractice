@@ -8,7 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1380, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.6'; // bump the last number on every update
+const VERSION = '0.0.7'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -207,7 +207,7 @@ function newGame() {
   G.endcaps[MAPD.endcaps[5].id] = 'A3';
   G.crew.push({ id: nid(), name: 'Maria L.', role: 'breakdown', shift: 'open', skill: 3, wage: 16.25, calledOut: false });
   G.crew.push({ id: nid(), name: 'Devon P.', role: 'freight', shift: 'truck6', skill: 3, wage: 16.25, calledOut: false });
-  G.crew.forEach(c => ensureTrain(c, 40));
+  G.crew.forEach(c => ensureMorale(ensureTrain(c, 40)));
   G.trash = [];
   buildTruck(suggestedOrder()).forEach(p => placePallet(p));
   RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {};
@@ -248,9 +248,9 @@ function startDay() {
   for (let i = 0; i < nTags; i++) addTag('change');
   G.vendorsToday = VENDORS.map(v => ({ ...v, state: 'pending' }));
   G.candidates = [makeCandidate(), makeCandidate(), makeCandidate()];
-  G.order = null; G.orderSubmitted = false; G.orderLocked = false;
+  G.order = null; G.orderSubmitted = false; G.orderLocked = false; G.conflict = null;
   G.crew.forEach(c => {
-    c.calledOut = G.day > 1 && Math.random() < 0.06;
+    c.calledOut = G.day > 1 && Math.random() < calloutChance(ensureMorale(c));
     if (c.calledOut) mail(c.name, 'Can\'t make it in today', `Hey, I'm sick and can't make my ${SHIFTS[c.shift].name} shift today. Sorry!\n— ${c.name}`);
   });
   const dowNow = dowOf(G.day);
@@ -296,6 +296,7 @@ function endDay() {
   G.crew.forEach(despawnCrew);
   tenureDay();
   const res = computeResults();
+  res.tips.push(...moraleDay(res));
   DEPTS.forEach(d => {
     G.history[d.id].push(t.demand[d.id] || 0);
     if (G.history[d.id].length > 14) G.history[d.id].shift();
@@ -423,6 +424,7 @@ function update(dt) {
     spawnCustomers(gm);
     orderWindowTick(prev);
     listTick();
+    conflictTick(gm);
     if (G.time > OPEN && G.time < CLOSE - 60 && Math.random() < gm / 140) {
       const before = G.tags.length;
       addTag('error');
@@ -455,7 +457,7 @@ function orderWindowTick(prev) {
 
 function onHour(h) {
   if (h >= 9 && h <= 21) spoilCheck();
-  mentorHour(); trashHour();
+  mentorHour(); trashHour(); moraleHour();
   if (h === 13 && G.sat < 55) mail('Customer Service Desk', 'Complaints are piling up', 'We\'re getting a lot of complaints about empty shelves and wrong prices today. Can someone check the floor?');
   if (h === 16) toast('🛒 Rush hour is coming (4–7 PM). Top off the fast movers now!', 'warn');
   if (h % 2 === 0) save();
@@ -620,9 +622,9 @@ function rt(c) {
     carry: [], floatId: null, pallet: null, cleanups: [], progress: 0, label: '', intent: '',
   });
 }
-const sf = c => (0.7 + 0.12 * c.skill) * (isStar(c) ? 1.15 : 1);
+const sf = c => (0.7 + 0.12 * c.skill) * (isStar(c) ? 1.15 : 1) * moraleSpeed(c);
 function onShift(c) {
-  if (c.calledOut) return false;
+  if (c.calledOut || c.sentHome === G.day) return false;
   const s = SHIFTS[c.shift];
   return G.time >= s.start && G.time < s.end;
 }
@@ -987,6 +989,8 @@ function getInteraction() {
     if (Math.hypot(p.x - f.homeX, p.y - f.homeY) < 1.6) return { label: 'Park float at its home spot', fn: () => releaseFloat(true) };
     return { label: 'Let go of the float', fn: () => releaseFloat(false) };
   }
+  const cf = !p.work && conflictInteraction(p);
+  if (cf) return cf;
   const coachee = G.crew.find(c => c.needsCoach && RT.crew[c.id] && RT.crew[c.id].inBuilding && dist(RT.crew[c.id], p) < 1.5);
   if (coachee && !p.work) return { label: `Coach ${coachee.name}: ${TRAIN_AREAS[coachee.needsCoach.area].mistake}`, fn: () => { const rr = RT.crew[coachee.id]; if (rr) rr.hold = 2.5; startWork(2.5, 'Coaching', () => coachCrew(coachee)); } };
   const trash = (G.trash || []).find(t => dist(t, p) < 1.1);
@@ -1015,6 +1019,8 @@ function getInteraction() {
     return { label: `Push the ${DEPT[fl.dept].name} float (${plural(fl.cases.length, 'case')})`, fn: () => grabFloat(fl) };
   }
   if (rackDept && G.stock[rackDept].back > 0) return { label: `Pull backstock: ${DEPT[rackDept].name} (${Math.ceil(G.stock[rackDept].back / DEPT[rackDept].upc)} cs)`, fn: () => playerPullBack(rackDept) };
+  const mi = !p.work && moraleInteraction(p);
+  if (mi) return mi;
   if (shelfDept) return { label: `${DEPT[shelfDept].aisle} · ${DEPT[shelfDept].name}: shelf ${Math.round(shelfPct(shelfDept) * 100)}% full`, fn: null };
   return null;
 }
@@ -1115,7 +1121,7 @@ function load() {
     if (s.version !== 1) return false;
     G = s;
     G.trash = G.trash || [];
-    G.crew.forEach(c => ensureTrain(c, 40));
+    G.crew.forEach(c => ensureMorale(ensureTrain(c, 40)));
     if (!G.list && G.phase === 'day') G.list = buildChecklist();
     RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {};
     G.vendorsToday.forEach(v => {

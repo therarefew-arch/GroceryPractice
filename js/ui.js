@@ -187,32 +187,53 @@ const UI = {
 
   tab_crew() {
     const hours = sh => (SHIFTS[sh].end - SHIFTS[sh].start) / 60;
-    let h = `<h2>Crew & Schedule</h2><p class="mute">Change roles and shifts any time — it takes effect right away. Crew slots: ${G.crew.length}/${maxCrew()} (level up for more).</p>`;
-    h += `<table><tr><th>Name</th><th>Role</th><th>Shift</th><th>Skill</th><th>Rank</th><th>Training</th><th class="n">Coached</th><th class="n">Days</th><th class="n">Wage</th><th>Right now</th><th></th></tr>`;
+    let h = `<h2>Crew & Schedule</h2><p class="mute">Change roles and shifts any time — it takes effect right away. Crew slots: ${G.crew.length}/${maxCrew()} (level up for more). Team morale: <b style="color:${moodOf({ morale: teamMorale(), trait: 'quiet' }).col}">${Math.round(teamMorale())}%</b></p>`;
+    h += `<table><tr><th>Name</th><th>Role</th><th>Shift</th><th>Skill</th><th>Rank</th><th>Training</th><th>Morale</th><th class="n">Coached</th><th class="n">Days</th><th class="n">Wage</th><th>Right now</th><th></th></tr>`;
     for (const c of G.crew) {
       const r = RT.crew[c.id];
       const status = c.calledOut ? '<span class="bad">Called out</span>' : onShift(c) ? (r && r.inBuilding ? `<span class="good">${r.intent || 'On the clock'}</span>` : 'Clocking in') : '<span class="mute">Off the clock</span>';
       h += `<tr><td><span class="dot" style="background:${ROLES[c.role].color}"></span>${esc(c.name)}</td>
         <td><select onchange="UI.setRole(${c.id},this.value)">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${k === c.role ? 'selected' : ''}>${v.name}</option>`).join('')}</select></td>
         <td><select onchange="UI.setShift(${c.id},this.value)">${Object.entries(SHIFTS).map(([k, v]) => `<option value="${k}" ${k === c.shift ? 'selected' : ''}>${v.name}</option>`).join('')}</select></td>
-        <td>${stars(c.skill)}</td><td>${rankHTML(c)}</td><td>${trainMeter(c)}</td><td class="n">${c.coached || 0}</td><td class="n">${c.days || 0}</td><td class="n">$${c.wage.toFixed(2)}/hr</td><td>${status}${c.needsCoach ? ' <span class="bad">⚠ needs coaching</span>' : ''}</td>
-        <td><button class="danger" onclick="UI.fire(${c.id})">Fire</button></td></tr>`;
+        <td>${stars(c.skill)}</td><td>${rankHTML(c)}</td><td>${trainMeter(c)}</td><td title="${TRAITS[ensureMorale(c).trait].desc}" style="white-space:nowrap">${moodOf(c).icon} ${Math.round(c.morale)}% <span class="mute">${TRAITS[c.trait].name}</span>${c.strikes ? ` <span class="warn">${c.strikes}✎</span>` : ''}</td><td class="n">${c.coached || 0}</td><td class="n">${c.days || 0}</td><td class="n">$${c.wage.toFixed(2)}/hr</td><td>${status}${c.needsCoach ? ' <span class="bad">⚠ needs coaching</span>' : ''}${c.notice ? ` <span class="bad">🚪 gave notice (last day ${c.notice})</span>` : ''}${c.promoAsk ? ' <span class="warn">📈 asked to move up</span>' : ''}${c.sentHome === G.day ? ' <span class="mute">sent home</span>' : ''}</td>
+        <td style="white-space:nowrap">${c.lead ? '<span class="good">◆ Lead</span> ' : canPromote(c) ? `<button onclick="UI.promote(${c.id})">Promote</button> ` : ''}<button class="danger" onclick="UI.fire(${c.id})">Fire</button></td></tr>`;
     }
     h += '</table>';
     const proj = sum(G.crew.filter(c => !c.calledOut && c.shift !== 'night').map(c => hours(c.shift) * c.wage));
     const projN = sum(G.crew.filter(c => c.shift === 'night').map(c => hours(c.shift) * c.wage));
     h += `<p>Scheduled day labor: <b>${money(proj)}</b> ≈ <b>${(proj / Math.max(1, G.today.goal) * 100).toFixed(1)}%</b> of today's sales goal. Night crew: <b>${money(projN)}</b> (charged to the next day). Target ≤ ${LABOR_TARGET}%.</p>`;
     h += `<h3>Training & coaching</h3><p class="mute">New hires make mistakes: wrong floats, cardboard left in aisles, wrong tags, short DSD deliveries, phone breaks. A red <b class="bad">!</b> appears over their head. Walk up and press <kbd>E</kbd> to coach them within 2 hours, or the mistake becomes a habit. Rookie → Trained → Pro → <b style="color:#ffd34d">★ Superstar</b> (85% trained, coached 8+ times, 3+ days on the job): 15% faster, no mistakes, and mentors rookies on their shift.</p>`;
+    h += `<h3>Morale, conflicts & promotions</h3><p class="mute">Morale changes work speed (−15% when miserable, +5% when fired up) and call-outs. It goes up when you thank people (walk up and press <kbd>E</kbd>, once a day each), coach them, promote them and have good days. It goes down with shift changes, bad days, being ignored for 3+ days, unhandled arguments and unfair discipline. Below 20%, people give 3 days' notice: talk to them to turn it around. When an argument starts (orange <b style="color:#ff8c1a">!!</b>), walk over and press <kbd>E</kbd>: talk it out, split them up, write up, send home or let go. The right call depends on how serious it is and the person's write-up history. Pros and Superstars with 5+ days can be promoted to <b>◆ Lead</b> (+$${LEAD_RAISE.toFixed(2)}/hr, max ${MAX_LEADS}): leads work 5% faster, lift morale on their shift and calm arguments.</p>`;
+    const ex = (G.exits || []).slice().reverse();
+    if (ex.length) h += '<h3>Exit interviews</h3><table><tr><th>Name</th><th>Left</th><th>Why</th><th class="n">Days</th><th>What they said</th></tr>' + ex.map(e => `<tr><td>${esc(e.name)}</td><td>${dayLabel(e.day)}</td><td>${e.why === 'quit' ? '<span class="bad">Quit</span>' : 'Let go'}</td><td class="n">${e.days}</td><td class="mute">${e.why === 'quit' ? esc(e.gripes.map(g => GRIPE_TEXT[g]).join(' ') || 'It just wasn\'t working out.') : '—'}</td></tr>`).join('') + '</table>';
     h += `<h3>Roles</h3><table>${Object.values(ROLES).map(r => `<tr><td style="white-space:nowrap"><span class="dot" style="background:${r.color}"></span><b>${r.name}</b></td><td class="mute">${r.desc}</td></tr>`).join('')}</table>`;
     return h;
   },
+  promote(id) { const c = G.crew.find(x => x.id === id); if (c) promoteCrew(c); this.render(); },
+  showConflict() {
+    const k = G.conflict; if (!k) return;
+    const [a, b] = conflictCrew();
+    const btn = (ch, l, d) => `<button style="display:block;width:100%;text-align:left;margin:6px 0;padding:8px" onclick="UI.pickConflict('${ch}')"><b>${l}</b><div class="mute" style="font-size:12px">${d}</div></button>`;
+    this.showModal(`<h2>⚡ ${SEV_NAME[k.sev]} conflict</h2><p>${esc(k.text)}</p>
+      <p class="mute">${esc(a.name)}: ${TRAITS[a.trait].name}, morale ${Math.round(a.morale)}%, write-ups on file: <b>${a.strikes}</b> · ${esc(b.name)}: ${TRAITS[b.trait].name}, morale ${Math.round(b.morale)}%</p>
+      ${btn('talk', 'Pull them aside and talk it out', 'Hear both sides and agree on a fix.')}
+      ${btn('split', 'Split them up', 'Send them to different areas for the rest of the shift.')}
+      ${btn('writeup', 'Write up ' + esc(a.name), 'A documented warning on file.')}
+      ${btn('home', 'Send ' + esc(a.name) + ' home for the day', 'Unpaid for the rest of the shift.')}
+      ${btn('fire', 'Let ' + esc(a.name) + ' go', 'Termination. Can\'t be undone.')}
+      <div class="row" style="justify-content:flex-end"><button onclick="UI.hideModal()">Walk away (for now)</button></div>`);
+  },
+  pickConflict(ch) {
+    const r = resolveConflict(ch); if (!r) return this.hideModal();
+    this.showModal(`<h2>${r.good ? '✅' : '⚠'} ${esc(r.verdict)}</h2><p><span class="mute">Why:</span> ${esc(r.why)}</p><div class="row" style="justify-content:flex-end;margin-top:12px"><button class="primary" onclick="UI.hideModal()">Back to work</button></div>`);
+    toast(r.good ? '🤝 Conflict handled well.' : '⚠ Conflict handled, but not well. Read the why.', r.good ? 'good' : 'warn');
+  },
   setRole(id, role) { const c = G.crew.find(x => x.id === id); c.role = role; const r = RT.crew[id]; if (r && r.plan) finishPlan(c, r); this.render(); },
-  setShift(id, sh) { const c = G.crew.find(x => x.id === id); c.shift = sh; const r = RT.crew[id]; if (r && r.plan) finishPlan(c, r); this.render(); },
+  setShift(id, sh) { const c = G.crew.find(x => x.id === id); if (c.shift !== sh && (c.days || 0) > 0) bump(c, -4, 'schedule'); c.shift = sh; const r = RT.crew[id]; if (r && r.plan) finishPlan(c, r); this.render(); },
   fire(id) {
     const c = G.crew.find(x => x.id === id);
-    if (!confirm(`Let ${c.name} go? This can't be undone.`)) return;
-    despawnCrew(c); delete RT.crew[id];
-    G.crew = G.crew.filter(x => x !== c);
+    if (!confirm(`Let ${c.name} go? This can't be undone.\nWrite-ups on file: ${c.strikes || 0}. Firing without documentation hurts team morale.`)) return;
+    letGo(c, 'fired');
     toast(`${c.name} was let go.`);
     this.render();
   },
@@ -230,7 +251,7 @@ const UI = {
     if (G.crew.length >= maxCrew()) return;
     const k = G.candidates.find(x => x.id === id);
     G.candidates = G.candidates.filter(x => x !== k);
-    G.crew.push(ensureTrain({ id: k.id, name: k.name, role: k.role, shift: k.shift, skill: k.skill, wage: k.wage, calledOut: false }, k.exp != null ? k.exp : hireTrainingBase(k.skill)));
+    G.crew.push(ensureMorale(ensureTrain({ id: k.id, name: k.name, role: k.role, shift: k.shift, skill: k.skill, wage: k.wage, calledOut: false }, k.exp != null ? k.exp : hireTrainingBase(k.skill))));
     toast(`Hired ${k.name} as ${ROLES[k.role].name} (${SHIFTS[k.shift].name}).`, 'good');
     this.render();
   },

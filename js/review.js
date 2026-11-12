@@ -13,6 +13,7 @@ function dayExtras(res) {
     coached: t.coached || 0, mistakes: t.crewMistakes || 0, systemOrder: !!t.systemOrder, vendorsMissed: t.vendorsMissed,
     vendorsIn: t.vendorsIn, spoiled: t.spoiled, tagsLeft: G.tags.length, misses: t.misses, requests: t.requests,
     labor: t.labor, trash: (G.trash || []).length, truckCases: t.truckCases,
+    teamMorale: Math.round(teamMorale()), conflicts: t.conflicts || 0, conflictsIgnored: t.conflictsIgnored || 0, exits: t.exits || 0,
   };
 }
 
@@ -103,6 +104,12 @@ function buildWeekReview(week) {
     'Mistakes you let slide become how the job gets done. Your best people were coached by someone who cared enough to stop and show them.',
     'When you see the red "!", stop and coach right then. It takes two minutes and it pays back every shift after.');
   else if (coached) praise.push(`You coached ${coached} time${coached > 1 ? 's' : ''}. That's how you build superstars.`);
+
+  const exits = S(d => d.exits || 0), ignored = S(d => d.conflictsIgnored || 0), mor = days[days.length - 1].teamMorale;
+  if (exits || ignored || (mor != null && mor < 50)) note('Your people', `Team morale ended the week at ${mor != null ? mor + '%' : 'unknown'}${exits ? `, ${exits} people left` : ''}${ignored ? `, and ${ignored} argument${ignored > 1 ? 's' : ''} went unhandled` : ''}.`,
+    'Every person who walks out costs you weeks of training and slows the whole crew down. Unhappy people work slower, call out more and argue more. The store runs on them.',
+    'Thank people for good work every day (press E next to them). Keep schedules steady. Step into arguments right away. When a strong worker asks to move up, give them an answer.');
+  else if (mor != null && mor >= 75) praise.push(`Team morale is ${mor}%. People want to work for you.`);
 
   if (oosAvg != null && oosAvg > OOS_GOAL) note('Out-of-stock count', `Your nightly count averaged ${Math.round(oosAvg)} against a goal of ${OOS_GOAL}.`,
     'The count tells you how the store looks to the last customer of the night and the first one tomorrow.',

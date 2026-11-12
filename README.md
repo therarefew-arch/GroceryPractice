@@ -1,6 +1,6 @@
 # Grocery Practice
 
-**Version 0.0.6**
+**Version 0.0.7**
 
 A 2D grocery store manager simulator for practicing the real job: receiving the night truck, building floats, working freight, keeping the shelves full, running the crew, and ordering for tomorrow. All without blowing the labor budget.
 
@@ -43,6 +43,10 @@ It's plain HTML/JavaScript, so there's no build step.
 
 **Training & coaching:** new hires make realistic mistakes (wrong float, cardboard left in an aisle, tag on the wrong item, signing for a short DSD delivery, phone breaks). A red **!** appears over them. Walk up and press `E` to coach within 2 hours, or the mistake becomes a habit. Crew rank up Rookie → Trained → Pro → ★ Superstar (85% trained, coached 8+ times, 3+ days on the job). Superstars work 15% faster, make no mistakes and mentor rookies on their shift. Hover any worker to see their training bars.
 
+**Morale & conflicts:** every worker has a morale level and a personality (Easygoing, Hothead, Perfectionist, Social, Quiet). Morale changes their work speed and how often they call out. Thank people for good work (walk up and press `E`, once a day each) and keep schedules steady. Arguments break out (orange **!!**): walk over and press `E` to talk it out, split them up, write up, send home or let go. The right call depends on how serious it is and the person's write-up history, and you always get the why. Below 20% morale, people give 3 days' notice; talk to them to change their mind. When someone quits, HR sends you their exit interview: why they left and what to fix.
+
+**Promotions:** Pros and Superstars with 5+ days can be promoted to ◆ Lead (+$1.50/hr, max 2). Leads work faster, lift morale on their shift and calm arguments. Strong workers will ask to move up; answer within 3 days or they feel passed over.
+
 **Weekly DM review:** after Friday's close (weeks run Saturday to Friday) your District Manager grades the week. He is harsh but fair: for every problem he tells you what he saw, why it matters and what to do next week. Reviews also land in your email and on the Records tab.
 
 **Records board:** Office computer → 🏆 Records tracks your personal bests (best score, top sales, fastest truck, lowest labor %, best in-stock, lowest OOS count, longest B-or-better streak, most coaching in a day).
@@ -63,6 +67,7 @@ Everything store-specific lives in [`js/data.js`](js/data.js): departments/aisle
 | `js/render.js` | Canvas drawing and the zoom camera |
 | `js/training.js` | Crew mistakes, coaching, ranks, mentoring, cardboard trash |
 | `js/fx.js` | Sound effects, combos, confetti, minimap, worker hover info |
+| `js/morale.js` | Morale, conflicts, promotions, notice and exit interviews |
 | `js/review.js` | Weekly DM review, records board, gamepad |
 | `js/ui.js` | HUD, office computer, modals |
 
