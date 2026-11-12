@@ -8,6 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1320, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
+const VERSION = '0.0.1'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -1041,6 +1042,9 @@ function boot() {
   buildMap();
   canvas.width = MW * TILE; canvas.height = MH * TILE;
   BG = drawBG();
+  const ver = document.getElementById('ver'); if (ver) ver.textContent = 'v' + VERSION;
+  document.title = 'Grocery Practice v' + VERSION;
+  if (document.fonts) document.fonts.load(PX(8)).then(() => { BG = drawBG(); }).catch(() => {});
   UI.init();
   try { RT.settings.labels = localStorage.getItem('groceryPractice.labels') !== 'off'; } catch (e) { /* ignore */ }
   if (load()) UI.showContinue();

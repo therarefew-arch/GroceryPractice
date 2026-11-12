@@ -1,5 +1,7 @@
 # Grocery Practice
 
+**Version 0.0.1**
+
 A 2D grocery store manager simulator for practicing the real job: receiving the night truck, building floats, working freight, keeping the shelves full, running the crew, and ordering for tomorrow. All without blowing the labor budget.
 
 ## Play

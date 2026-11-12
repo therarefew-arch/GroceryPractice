@@ -1,8 +1,18 @@
 'use strict';
 // =====================================================================
-//  Rendering (canvas). Static map is pre-drawn once into BG.
+//  Rendering (canvas). Sci-fi pixel look: dark metal floor plates,
+//  beveled steel walls, glowing screens, amber circuit-grid outside.
+//  The static map is pre-drawn once into BG; OVERLAY adds scanlines.
 // =====================================================================
 const T = TILE;
+const PX = (size, bold) => `${bold === false ? '' : 'bold '}${size}px Silkscreen, 'Courier New', monospace`;
+const PAL = {
+  void: '#0b090c', grid: 'rgba(240,170,40,0.10)', gridHi: 'rgba(255,190,60,0.38)', amber: '#ffb238',
+  plateA: '#3b3f43', plateB: '#363a3e', seam: '#1d2023', bevel: 'rgba(255,255,255,0.06)',
+  floorA: '#454a4c', floorB: '#3f4446',
+  wallHi: '#c5ccd6', wall: '#7c8592', wallLo: '#3a404a', wallCore: '#262b33',
+  cyan: '#42d7ff', cyanDim: '#1b6f8c', plate: '#14223a', plateEdge: '#5fb8e8', green: '#57f287',
+};
 
 function rrect(g, x, y, w, h, r) {
   g.beginPath();
@@ -11,95 +21,260 @@ function rrect(g, x, y, w, h, r) {
 }
 function label(g, text, x, y, opts) {
   opts = opts || {};
-  g.font = opts.font || 'bold 10px system-ui, sans-serif';
+  g.font = opts.font || PX(8);
   g.textAlign = opts.align || 'center';
   g.textBaseline = 'middle';
-  if (opts.outline) { g.lineWidth = 3; g.strokeStyle = opts.outline; g.strokeText(text, x, y); g.lineWidth = 1; }
+  if (opts.glow) { g.shadowColor = opts.glow; g.shadowBlur = 8; }
+  if (opts.outline) { g.lineWidth = 3; g.strokeStyle = opts.outline; g.lineJoin = 'round'; g.strokeText(text, x, y); g.lineWidth = 1; }
   g.fillStyle = opts.color || '#fff';
   g.fillText(text, x, y);
+  g.shadowBlur = 0;
   g.textBaseline = 'alphabetic';
 }
+// Navy nameplate with a cyan rim, like a desk sign.
+function nameplate(g, text, x, y, opts) {
+  opts = opts || {};
+  g.font = opts.font || PX(8);
+  const w = Math.ceil(g.measureText(text).width) + (opts.pad || 10), h = opts.h || 13;
+  const rx = Math.round(x - w / 2), ry = Math.round(y - h / 2);
+  g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillRect(rx + 2, ry + 2, w, h);
+  g.fillStyle = opts.bg || PAL.plate; g.fillRect(rx, ry, w, h);
+  g.fillStyle = opts.edge || PAL.plateEdge; g.fillRect(rx, ry, w, 2);
+  g.fillStyle = 'rgba(255,255,255,0.08)'; g.fillRect(rx, ry + 2, w, 1);
+  g.strokeStyle = opts.edge || PAL.plateEdge; g.globalAlpha = 0.6; g.strokeRect(rx + 0.5, ry + 0.5, w - 1, h - 1); g.globalAlpha = 1;
+  label(g, text, x, y + 1, { font: g.font, color: opts.color || '#f2f7ff' });
+  return w;
+}
 const noise = (x, y) => ((((x * 73856093) ^ (y * 19349663)) >>> 0) % 1000) / 1000;
+const isWall = (x, y) => y >= 0 && y < MH && x >= 0 && x < MW && MAPD.grid[y][x] === '#';
+
+function glowRect(g, x, y, w, h, color, blur) {
+  g.save(); g.shadowColor = color; g.shadowBlur = blur || 10; g.fillStyle = color; g.fillRect(x, y, w, h); g.restore();
+}
+
+// A glowing monitor (used by registers and the office PC).
+function screen(g, x, y, w, h, color, lines) {
+  g.fillStyle = '#0a0f14'; g.fillRect(x - 2, y - 2, w + 4, h + 4);
+  glowRect(g, x, y, w, h, color, 12);
+  g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(x, y, w, 1);
+  if (lines) { g.fillStyle = 'rgba(0,30,40,0.45)'; for (let i = 3; i < h - 1; i += 3) g.fillRect(x + 2, y + i, (w - 4) * (0.4 + noise(x, i) * 0.6), 1); }
+}
+
+// Light-gray beveled frame (desk/shelf/pod housing).
+function housing(g, x, y, w, h) {
+  g.fillStyle = 'rgba(0,0,0,0.45)'; g.fillRect(x + 3, y + 3, w, h);
+  g.fillStyle = '#9aa2ab'; g.fillRect(x, y, w, h);
+  g.fillStyle = '#d5dbe2'; g.fillRect(x, y, w, 2); g.fillRect(x, y, 2, h);
+  g.fillStyle = '#5d646d'; g.fillRect(x, y + h - 2, w, 2); g.fillRect(x + w - 2, y, 2, h);
+}
+
+function conveyor(g, x, y, len, vertical) {
+  const w = vertical ? 10 : len, h = vertical ? len : 10;
+  g.fillStyle = '#1a1d21'; g.fillRect(x, y, w, h);
+  g.fillStyle = '#6d747d';
+  if (vertical) { g.fillRect(x, y, 2, h); g.fillRect(x + w - 2, y, 2, h); for (let i = 2; i < h; i += 4) g.fillRect(x + 2, y + i, w - 4, 1); }
+  else { g.fillRect(x, y, w, 2); g.fillRect(x, y + h - 2, w, 2); for (let i = 2; i < w; i += 4) g.fillRect(x + i, y + 2, 1, h - 4); }
+  g.fillStyle = 'rgba(66,215,255,0.5)';
+  if (vertical) for (let i = 8; i < h; i += 24) g.fillRect(x + 3, y + i, 4, 2);
+  else for (let i = 8; i < w; i += 24) g.fillRect(x + i, y + 4, 2, 2);
+}
+
+function drawOutside(g) {
+  g.fillStyle = PAL.void; g.fillRect(0, 0, MW * T, MH * T);
+  // dim red haze blobs
+  for (const [cx, cy, r] of [[300, 18, 60], [930, 30, 70], [1180, 812, 70], [120, 818, 55], [700, 830, 50]]) {
+    const gr = g.createRadialGradient(cx, cy, 4, cx, cy, r);
+    gr.addColorStop(0, 'rgba(150,40,50,0.35)'); gr.addColorStop(1, 'rgba(150,40,50,0)');
+    g.fillStyle = gr; g.fillRect(cx - r, cy - r, r * 2, r * 2);
+  }
+  // amber circuit grid
+  g.lineWidth = 1;
+  for (let x = 0; x <= MW * T; x += T / 2) { g.strokeStyle = x % (T * 2) === 0 ? PAL.gridHi : PAL.grid; g.beginPath(); g.moveTo(x + 0.5, 0); g.lineTo(x + 0.5, MH * T); g.stroke(); }
+  for (let y = 0; y <= MH * T; y += T / 2) { g.strokeStyle = y % (T * 2) === 0 ? PAL.gridHi : PAL.grid; g.beginPath(); g.moveTo(0, y + 0.5); g.lineTo(MW * T, y + 0.5); g.stroke(); }
+  // specks and bright nodes
+  for (let i = 0; i < 520; i++) {
+    const x = noise(i, 7) * MW * T, y = noise(13, i) * MH * T, b = noise(i, i);
+    g.fillStyle = b > 0.93 ? '#ffd27a' : b > 0.7 ? 'rgba(255,190,90,0.55)' : 'rgba(255,255,255,0.25)';
+    g.fillRect(Math.round(x), Math.round(y), b > 0.93 ? 2 : 1, b > 0.93 ? 2 : 1);
+  }
+  // a couple of glowing trace lines
+  g.save(); g.shadowColor = PAL.amber; g.shadowBlur = 6; g.strokeStyle = 'rgba(255,178,56,0.7)'; g.lineWidth = 1.5;
+  g.beginPath(); g.moveTo(0, 1.25 * T); g.lineTo(7 * T, 1.25 * T); g.lineTo(7.5 * T, 0.6 * T); g.lineTo(16 * T, 0.6 * T); g.stroke();
+  g.beginPath(); g.moveTo(24 * T, 25.4 * T); g.lineTo(31 * T, 25.4 * T); g.lineTo(32 * T, 24.9 * T); g.lineTo(MW * T, 24.9 * T); g.stroke();
+  g.restore(); g.lineWidth = 1;
+}
+
+function drawFloorTile(g, x, y, ch) {
+  const px = x * T, py = y * T, n = noise(x, y);
+  const sales = y > 10;
+  const office = ch === 'o' || ch === 'C';
+  g.fillStyle = office ? ((x + y) % 2 ? '#2c3b44' : '#29373f') : sales ? ((x + y) % 2 ? PAL.floorA : PAL.floorB) : ((x + y) % 2 ? PAL.plateA : PAL.plateB);
+  g.fillRect(px, py, T, T);
+  // grate texture
+  g.fillStyle = 'rgba(0,0,0,0.12)';
+  for (let i = 4; i < T; i += 4) g.fillRect(px + 2, py + i, T - 4, 1);
+  if (n > 0.6) { g.fillStyle = 'rgba(0,0,0,0.08)'; g.fillRect(px + 4, py + 4, T - 8, T - 8); }
+  // seams + bevel
+  g.fillStyle = PAL.seam; g.fillRect(px, py + T - 1, T, 1); g.fillRect(px + T - 1, py, 1, T);
+  g.fillStyle = PAL.bevel; g.fillRect(px, py, T - 1, 1); g.fillRect(px, py, 1, T - 1);
+  // rivets
+  g.fillStyle = 'rgba(255,255,255,0.10)'; g.fillRect(px + 3, py + 3, 1, 1); g.fillRect(px + T - 5, py + T - 5, 1, 1);
+}
+
+function drawWallTile(g, x, y) {
+  const px = x * T, py = y * T;
+  g.fillStyle = PAL.wallCore; g.fillRect(px, py, T, T);
+  // the steel band sits in the middle 20px of the tile and connects to neighbours
+  const m = 6, s = T - 2 * m;
+  const L = isWall(x - 1, y), R = isWall(x + 1, y);
+  const U = isWall(x, y - 1), D = isWall(x, y + 1);
+  const bx = L ? px : px + m, ex = R ? px + T : px + m + s;
+  const by = U ? py : py + m, ey = D ? py + T : py + m + s;
+  g.fillStyle = PAL.wall; g.fillRect(bx, py + m, ex - bx, s); g.fillRect(px + m, by, s, ey - by);
+  g.fillStyle = PAL.wallHi; g.fillRect(bx, py + m, ex - bx, 2); g.fillRect(px + m, by, 2, ey - by);
+  g.fillStyle = PAL.wallLo; g.fillRect(bx, py + m + s - 3, ex - bx, 3); g.fillRect(px + m + s - 3, by, 3, ey - by);
+  g.fillStyle = '#5a626e'; g.fillRect(bx, py + m + 6, ex - bx, 1);
+  // inner groove
+  g.fillStyle = 'rgba(0,0,0,0.35)'; if (L || R) g.fillRect(bx, py + T / 2, ex - bx, 1);
+}
 
 function drawBG() {
   const b = document.createElement('canvas');
   b.width = MW * T; b.height = MH * T;
   const g = b.getContext('2d');
+  drawOutside(g);
+
+  // building shadow + rim glow
+  g.save(); g.shadowColor = 'rgba(120,200,255,0.35)'; g.shadowBlur = 24; g.fillStyle = '#1c2026';
+  rrect(g, 0, 2 * T, MW * T, 23 * T, 18); g.fill(); g.restore();
+
   for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
     const ch = MAPD.grid[y][x], px = x * T, py = y * T;
-    let floor;
-    if (ch === '~') floor = '#2b2e34';
-    else if (y < 10) floor = (ch === 'o' || ch === 'C') ? ((x + y) % 2 ? '#b39a76' : '#ab926e') : '#8e949c';
-    else floor = (x + y) % 2 ? '#ece7dc' : '#e2dccf';
-    g.fillStyle = floor; g.fillRect(px, py, T, T);
-    if (ch === '~') { g.fillStyle = 'rgba(255,255,255,0.03)'; for (let i = 0; i < 4; i++) g.fillRect(px + noise(x, y + i) * T, py + noise(y, x + i) * T, 2, 2); }
-    if (y < 10 && y > 2 && ch !== '#' && ch !== 'o' && ch !== 'C') { g.strokeStyle = 'rgba(0,0,0,0.06)'; g.strokeRect(px + 0.5, py + 0.5, T, T); }
-    if (ch === '#') { g.fillStyle = '#434a58'; g.fillRect(px, py, T, T); g.fillStyle = '#525a6a'; g.fillRect(px, py, T, 4); }
+    if (ch === '~') continue;
+    if (ch === '#') { drawWallTile(g, x, y); continue; }
+    drawFloorTile(g, x, y, ch);
+    if (ch === 'r') { g.fillStyle = 'rgba(255,178,56,0.05)'; g.fillRect(px, py, T, T); }
     if (ch === 'D') {
-      g.fillStyle = '#2a2a2a'; g.fillRect(px, py, T, T);
-      g.fillStyle = '#f2c94c';
-      g.save(); g.beginPath(); g.rect(px, py, T, T); g.clip();
+      g.fillStyle = PAL.wallCore; g.fillRect(px, py, T, T);
+      g.fillStyle = '#1a1c20'; g.fillRect(px + 1, py + 6, T - 2, T - 12);
+      g.save(); g.beginPath(); g.rect(px + 1, py + 6, T - 2, T - 12); g.clip(); g.fillStyle = '#e8a92a';
       for (let i = -T; i < T * 2; i += 10) { g.beginPath(); g.moveTo(px + i, py + T); g.lineTo(px + i + 5, py + T); g.lineTo(px + i + 5 + T, py); g.lineTo(px + i + T, py); g.closePath(); g.fill(); }
       g.restore();
+      glowRect(g, px + T / 2 - 3, py + T - 5, 6, 3, (x % 2) ? '#ff5544' : PAL.green, 8);
     }
-    if (ch === 'v') { g.fillStyle = '#3d7a4f'; g.fillRect(px + 2, py, T - 4, T); label(g, 'DSD', px + T / 2, py + T / 2, { font: 'bold 9px system-ui' }); }
-    if (ch === 'X') { g.fillStyle = '#9fd8f7'; g.fillRect(px, py + 8, T, T - 16); g.strokeStyle = '#5aa9d6'; g.strokeRect(px + 0.5, py + 8.5, T - 1, T - 17); }
-    if (ch === '=') { g.fillStyle = '#8b6b4a'; g.fillRect(px + 1, py + 6, T - 2, T - 12); g.fillStyle = '#5c4630'; g.fillRect(px + T / 2 - 1, py + 6, 2, T - 12); }
+    if (ch === 'v') {
+      g.fillStyle = PAL.wallCore; g.fillRect(px, py, T, T);
+      g.fillStyle = '#21402c'; g.fillRect(px + 3, py + 4, T - 6, T - 8);
+      glowRect(g, px + 6, py + 6, T - 12, 2, PAL.green, 8);
+      label(g, 'DSD', px + T / 2, py + T / 2 + 3, { font: PX(8), color: '#bdf7cf' });
+    }
+    if (ch === 'X') {
+      g.fillStyle = PAL.wallCore; g.fillRect(px, py, T, T);
+      g.fillStyle = 'rgba(66,215,255,0.18)'; g.fillRect(px, py + 8, T, T - 16);
+      glowRect(g, px, py + 8, T, 2, PAL.cyan, 10); glowRect(g, px, py + T - 10, T, 2, PAL.cyan, 10);
+    }
+    if (ch === '=') {
+      g.fillStyle = PAL.wallCore; g.fillRect(px, py, T, T);
+      g.fillStyle = '#2a3038'; g.fillRect(px + 1, py + 5, T - 2, T - 10);
+      g.fillStyle = 'rgba(66,215,255,0.25)'; g.fillRect(px + 1, py + 5, T - 2, T - 10);
+      g.fillStyle = '#111'; g.fillRect(px + T / 2 - 1, py + 5, 2, T - 10);
+      glowRect(g, px + 2, py + 5, T - 4, 1, PAL.cyan, 6);
+    }
     if (ch === 'R') {
-      g.fillStyle = '#3a3f4b'; rrect(g, px + 2, py + 4, T - 4, T - 8, 4); g.fill();
-      g.fillStyle = '#7ee0a1'; g.fillRect(px + 8, py + 8, 10, 6);
-      g.fillStyle = '#222'; g.fillRect(px + 4, py + 18, T - 8, 6);
+      housing(g, px + 1, py + 4, T - 2, T - 6);
+      g.fillStyle = '#2b3038'; g.fillRect(px + 4, py + 15, T - 8, T - 21);
+      screen(g, px + 9, py + 6, 14, 7, PAL.cyan, true);
     }
     if (ch === 'C') {
-      g.fillStyle = '#6b4f33'; g.fillRect(px, py + 4, T, T - 8);
-      if (x === 36) { g.fillStyle = '#111'; g.fillRect(px + 14, py + 6, 30, 16); g.fillStyle = '#3fa9f5'; g.fillRect(px + 16, py + 8, 26, 12); g.fillStyle = '#222'; g.fillRect(px + 26, py + 22, 6, 4); }
+      housing(g, px, py + 2, T, T - 6);
     }
   }
-  // Zone markings
-  g.strokeStyle = '#f2c94c'; g.setLineDash([6, 4]); g.lineWidth = 2;
-  g.strokeRect(1 * T + 2, 4 * T + 2, 8 * T - 4, 5 * T - 4);
-  g.setLineDash([]); g.lineWidth = 1;
-  label(g, 'RECEIVING', 5 * T, 9.5 * T, { color: '#f2c94c', font: 'bold 11px system-ui' });
+  // Office workstation: screen over both desk tiles, plus a chair
+  {
+    const px = 36 * T, py = 3 * T;
+    screen(g, px + 8, py + 5, 48, 14, PAL.cyan, false);
+    label(g, 'STORENET', px + T, py + 13, { font: PX(7, false), color: '#062a38' });
+    g.fillStyle = '#2b3a55'; g.fillRect(px + T - 7, py + T + 4, 14, 10);
+    g.fillStyle = '#3d5277'; g.fillRect(px + T - 7, py + T + 4, 14, 3);
+    g.fillStyle = '#111'; g.fillRect(px + T - 1, py + T + 14, 2, 4);
+  }
+
+  // Ceiling lights along the top wall and the sales-floor wall
+  for (const lx of [8, 14, 20, 30]) glowRect(g, lx * T, 2 * T + 9, 18, 4, '#f2f6ff', 14);
+  for (const lx of [4, 10, 16, 24, 30, 36]) glowRect(g, lx * T + 6, 10 * T + 9, 18, 4, '#f2f6ff', 14);
+
+  // Conveyors (decor) along the receiving zone and float staging
+  conveyor(g, 1 * T + 4, 9 * T + 11, 8 * T - 8, false);
+  conveyor(g, 10 * T + 4, 6 * T + 21, 15 * T - 8, false);
+
+  // Receiving zone: amber hazard border
+  g.save(); g.shadowColor = PAL.amber; g.shadowBlur = 8; g.strokeStyle = PAL.amber; g.setLineDash([6, 4]); g.lineWidth = 2;
+  g.strokeRect(1 * T + 2, 4 * T + 2, 8 * T - 4, 5 * T - 4); g.restore();
   MAPD.floatSpots.forEach(s => {
-    g.strokeStyle = '#4aa3df'; g.lineWidth = 2; g.strokeRect(s.x * T + 2, s.y * T + 2, T - 4, T - 4); g.lineWidth = 1;
-    label(g, DEPT[s.dept].id, s.x * T + T / 2, (s.y + 1) * T + 9, { color: '#cfe8ff', font: 'bold 9px system-ui' });
+    g.save(); g.shadowColor = PAL.cyan; g.shadowBlur = 6; g.strokeStyle = 'rgba(66,215,255,0.8)'; g.lineWidth = 1.5;
+    g.strokeRect(s.x * T + 3, s.y * T + 3, T - 6, T - 6); g.restore();
+    g.fillStyle = DEPT[s.dept].color; g.fillRect(s.x * T + 3, (s.y + 1) * T + 2, T - 6, 2);
   });
-  label(g, 'FLOAT STAGING', 17.5 * T, 4.3 * T, { color: '#cfe8ff', font: 'bold 11px system-ui' });
-  label(g, 'DOCK DOORS', 4 * T, 3.5 * T, { color: '#3a3f4b', font: 'bold 10px system-ui' });
-  label(g, 'BACKSTOCK', 30.5 * T, 2.5 * T, { color: '#ddd', font: 'bold 10px system-ui' });
-  label(g, 'OFFICE', 36.5 * T, 2.5 * T, { color: '#ddd', font: 'bold 10px system-ui' });
-  label(g, 'TRUCK YARD', 20 * T, 1 * T, { color: '#666', font: 'bold 14px system-ui' });
-  label(g, 'PARKING LOT', 20 * T, 25.5 * T, { color: '#666', font: 'bold 12px system-ui' });
-  label(g, 'ENTRANCE', 20 * T, 23.5 * T, { color: '#8a8478', font: 'bold 10px system-ui' });
-  // Aisle signs
+  // Rack housings
+  for (const d of DEPTS) { const t = MAPD.rackTile[d.id]; housing(g, t.x * T, t.y * T, T, T); }
+
+  // Zone nameplates
+  nameplate(g, 'RECEIVING', 5 * T, 3.55 * T, { edge: PAL.amber, color: '#ffe2a6', font: PX(8) });
+  nameplate(g, 'FLOAT STAGING', 17.5 * T, 4.2 * T, { font: PX(8) });
+  nameplate(g, 'BACKSTOCK', 30.5 * T, 4.75 * T, { font: PX(8) });
+  nameplate(g, 'OFFICE', 36.5 * T, 9.35 * T, { font: PX(8) });
+  label(g, 'TRUCK YARD', 20 * T, 1 * T, { font: PX(14), color: '#ffcf70', glow: PAL.amber });
+  label(g, 'PARKING LOT', 20 * T, 25.5 * T, { font: PX(10), color: '#ffcf70', glow: PAL.amber });
+  label(g, 'ENTRANCE', 20 * T, 23.5 * T, { font: PX(8), color: 'rgba(66,215,255,0.7)' });
+  // Aisle signs as desk nameplates
   for (const [gx, ch] of GONDOLAS) {
     const d = DEPT[SHELF_DEPT[ch]];
-    const cx = gx * T + T / 2, cy = 11.5 * T;
-    g.fillStyle = d.color; rrect(g, cx - 44, cy - 13, 88, 26, 5); g.fill();
-    label(g, d.aisle.toUpperCase(), cx, cy - 5, { font: 'bold 9px system-ui' });
-    label(g, d.name, cx, cy + 6, { font: '9px system-ui' });
+    const cx = gx * T + T / 2, cy = 11.45 * T;
+    const w = nameplate(g, d.aisle.toUpperCase(), cx, cy - 5, { font: PX(8), h: 12 });
+    g.fillStyle = '#0d1626'; g.fillRect(Math.round(cx - w / 2), Math.round(cy + 1), w, 10);
+    g.fillStyle = d.color; g.fillRect(Math.round(cx - w / 2), Math.round(cy + 10), w, 2);
+    label(g, d.name.toUpperCase(), cx, cy + 6, { font: PX(6, false), color: '#9fc8e6' });
   }
-  const dai = DEPT.DAI;
-  g.fillStyle = dai.color; rrect(g, 37 * T - 6, 10.6 * T, T + 12, 13, 4); g.fill();
-  label(g, 'DAIRY', 37.5 * T + 3, 11.0 * T, { font: 'bold 9px system-ui' });
+  nameplate(g, 'DAIRY', 37.5 * T + 2, 11.0 * T, { font: PX(8), h: 12, edge: DEPT.DAI.color });
+  return b;
+}
+
+// Scanlines + vignette, drawn over everything each frame.
+let OVERLAY = null;
+function drawOverlay() {
+  const b = document.createElement('canvas');
+  b.width = MW * T; b.height = MH * T;
+  const g = b.getContext('2d');
+  g.fillStyle = 'rgba(0,0,0,0.10)';
+  for (let y = 0; y < b.height; y += 3) g.fillRect(0, y, b.width, 1);
+  const gr = g.createRadialGradient(b.width / 2, b.height / 2, b.height * 0.45, b.width / 2, b.height / 2, b.width * 0.7);
+  gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.45)');
+  g.fillStyle = gr; g.fillRect(0, 0, b.width, b.height);
   return b;
 }
 
 function drawShelves() {
   for (const dept in MAPD.shelfTiles) {
     const d = DEPT[dept], pct = shelfPct(dept), out = G.stock[dept].shelf <= 0;
-    const base = dept === 'DAI' ? '#b9dff0' : dept === 'FRZ' ? '#d3f1f4' : '#6b5844';
+    const cold = d.cold;
     for (const t of MAPD.shelfTiles[dept]) {
       const px = t.x * T, py = t.y * T;
-      ctx.fillStyle = base; ctx.fillRect(px + 2, py + 1, T - 4, T - 2);
+      housing(ctx, px + 1, py, T - 2, T);
+      ctx.fillStyle = cold ? '#0b2733' : '#151a20'; ctx.fillRect(px + 4, py + 3, T - 8, T - 6);
+      if (cold) { ctx.fillStyle = 'rgba(66,215,255,0.12)'; ctx.fillRect(px + 4, py + 3, T - 8, T - 6); }
       const local = clamp(pct * 1.25 - noise(t.x, t.y) * 0.35, 0, 1);
       const filled = Math.round(local * 9);
       for (let i = 0; i < 9; i++) {
         const cx = i % 3, cy = (i / 3) | 0;
-        ctx.fillStyle = (8 - i) < filled ? d.color : 'rgba(0,0,0,0.25)';
-        ctx.fillRect(px + 5 + cx * 8, py + 4 + cy * 9, 6, 7);
+        ctx.fillStyle = (8 - i) < filled ? d.color : 'rgba(255,255,255,0.05)';
+        ctx.fillRect(px + 6 + cx * 7, py + 5 + cy * 8, 6, 6);
+        if ((8 - i) < filled) { ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(px + 6 + cx * 7, py + 5 + cy * 8, 6, 1); }
       }
-      if (out) { ctx.strokeStyle = '#ff3b30'; ctx.lineWidth = 2; ctx.strokeRect(px + 2, py + 1, T - 4, T - 2); ctx.lineWidth = 1; }
+      if (out) {
+        const a = 0.5 + 0.5 * Math.sin(performance.now() / 180);
+        ctx.save(); ctx.shadowColor = '#ff3b30'; ctx.shadowBlur = 10; ctx.strokeStyle = `rgba(255,59,48,${0.6 + a * 0.4})`; ctx.lineWidth = 2;
+        ctx.strokeRect(px + 2, py + 1, T - 4, T - 2); ctx.restore();
+      }
     }
   }
 }
@@ -107,137 +282,188 @@ function drawShelves() {
 function drawRacks() {
   for (const d of DEPTS) {
     const t = MAPD.rackTile[d.id], px = t.x * T, py = t.y * T;
-    ctx.fillStyle = '#5b6370'; ctx.fillRect(px + 1, py + 1, T - 2, T - 2);
-    ctx.fillStyle = '#3d434d'; ctx.fillRect(px + 1, py + 15, T - 2, 2);
+    ctx.fillStyle = '#1a1e24'; ctx.fillRect(px + 4, py + 4, T - 8, T - 8);
+    ctx.fillStyle = '#5d646d'; ctx.fillRect(px + 4, py + 15, T - 8, 2);
     const cs = Math.ceil(G.stock[d.id].back / d.upc);
     for (let i = 0; i < Math.min(cs, 6); i++) {
       const cx = i % 3, cy = (i / 3) | 0;
-      ctx.fillStyle = d.color; ctx.fillRect(px + 4 + cx * 9, py + 4 + cy * 14, 7, 9);
+      ctx.fillStyle = d.color; ctx.fillRect(px + 6 + cx * 7, py + 6 + cy * 11, 6, 8);
     }
-    label(ctx, String(cs), px + T - 6, py + T - 6, { font: 'bold 9px system-ui', outline: '#000' });
+    label(ctx, String(cs), px + T - 5, py + T - 5, { font: PX(8), outline: '#000' });
   }
 }
 
 function drawEndcaps() {
   for (const e of MAPD.endcaps) {
     const dept = G.endcaps[e.id], px = e.x * T, py = e.y * T;
-    ctx.fillStyle = dept ? DEPT[dept].color : '#a8987f';
-    ctx.fillRect(px + 2, py + 3, T - 4, T - 6);
-    ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.strokeRect(px + 2.5, py + 3.5, T - 5, T - 7);
-    if (dept) label(ctx, '★', px + T / 2, py + T / 2, { font: 'bold 13px system-ui', color: '#fff8d6' });
+    housing(ctx, px + 1, py + 3, T - 2, T - 6);
+    ctx.fillStyle = '#151a20'; ctx.fillRect(px + 4, py + 6, T - 8, T - 12);
+    if (dept) {
+      glowRect(ctx, px + 5, py + 7, T - 10, T - 14, DEPT[dept].color, 10);
+      label(ctx, '★', px + T / 2, py + T / 2 + 1, { font: 'bold 12px system-ui', color: '#fff8d6' });
+    }
   }
 }
 
 function drawTags() {
   const blink = Math.floor(performance.now() / 400) % 2;
   for (const t of G.tags) {
-    const px = t.x * T, py = t.y * T;
-    ctx.fillStyle = t.kind === 'error' ? (blink ? '#ff3b30' : '#a51d16') : '#ffd84d';
-    ctx.fillRect(px + T - 14, py + 1, 12, 9);
-    label(ctx, '$', px + T - 8, py + 6, { font: 'bold 8px system-ui', color: '#000' });
+    const px = t.x * T, py = t.y * T, err = t.kind === 'error';
+    glowRect(ctx, px + T - 14, py + 1, 12, 9, err ? (blink ? '#ff3b30' : '#a51d16') : '#ffd84d', err ? 12 : 6);
+    label(ctx, '$', px + T - 8, py + 6, { font: PX(8), color: '#000' });
   }
 }
 
 function badge(x, y, text, bg) {
-  ctx.font = 'bold 10px system-ui';
+  ctx.font = PX(8);
   const w = Math.max(14, ctx.measureText(text).width + 6);
-  ctx.fillStyle = bg || '#111'; rrect(ctx, x - w / 2, y - 7, w, 14, 7); ctx.fill();
-  label(ctx, text, x, y + 0.5, { font: 'bold 10px system-ui' });
+  ctx.fillStyle = bg || '#111'; ctx.fillRect(Math.round(x - w / 2), Math.round(y - 6), w, 12);
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.strokeRect(Math.round(x - w / 2) + 0.5, Math.round(y - 6) + 0.5, w - 1, 11);
+  label(ctx, text, x, y + 1, { font: PX(8) });
 }
 
 function drawPallet(p, x0, y0) {
-  const s = 26, x = (x0 != null ? x0 : p.x) * T - s / 2, y = (y0 != null ? y0 : p.y) * T - s / 2;
-  ctx.fillStyle = '#9a7046'; ctx.fillRect(x, y, s, s);
-  ctx.fillStyle = '#7d5835'; for (let i = 0; i < 3; i++) ctx.fillRect(x, y + 4 + i * 9, s, 2);
+  const s = 26, x = Math.round((x0 != null ? x0 : p.x) * T - s / 2), y = Math.round((y0 != null ? y0 : p.y) * T - s / 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(x + 3, y + 3, s, s);
+  ctx.fillStyle = '#8a6a48'; ctx.fillRect(x, y, s, s);
+  ctx.fillStyle = '#6b4f33'; for (let i = 0; i < 3; i++) ctx.fillRect(x, y + 4 + i * 9, s, 2);
   p.cases.slice(-9).forEach((c, i) => {
-    const cx = i % 3, cy = (i / 3) | 0;
-    ctx.fillStyle = DEPT[c.d].color; ctx.fillRect(x + 2 + cx * 8, y + 2 + cy * 8, 7, 7);
-    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.strokeRect(x + 2.5 + cx * 8, y + 2.5 + cy * 8, 6, 6);
+    const cx = i % 3, cy = (i / 3) | 0, bx = x + 2 + cx * 8, by = y + 2 + cy * 8;
+    ctx.fillStyle = DEPT[c.d].color; ctx.fillRect(bx, by, 7, 7);
+    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(bx, by, 7, 1);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(bx, by + 6, 7, 1);
   });
-  if (p.cold) { ctx.strokeStyle = '#9be3ff'; ctx.lineWidth = 2; ctx.strokeRect(x - 1, y - 1, s + 2, s + 2); ctx.lineWidth = 1; }
-  badge(x + s - 1, y + s - 1, String(p.cases.length), p.cold ? '#1b6fa8' : '#111');
+  if (p.cold) { ctx.save(); ctx.shadowColor = PAL.cyan; ctx.shadowBlur = 8; ctx.strokeStyle = '#9be3ff'; ctx.lineWidth = 2; ctx.strokeRect(x - 1, y - 1, s + 2, s + 2); ctx.restore(); }
+  badge(x + s - 1, y + s - 1, String(p.cases.length), p.cold ? '#1b6fa8' : '#14223a');
 }
 
 function drawFloat(f) {
-  const w = 28, h = 20, x = f.x * T - w / 2, y = f.y * T - h / 2, d = DEPT[f.dept];
-  ctx.fillStyle = '#4b5563'; ctx.fillRect(x, y, w, h);
-  ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 2; ctx.strokeRect(x, y, w, h); ctx.lineWidth = 1;
-  ctx.fillStyle = d.color; ctx.fillRect(x, y - 4, w, 4);
+  const w = 28, h = 20, x = Math.round(f.x * T - w / 2), y = Math.round(f.y * T - h / 2), d = DEPT[f.dept];
+  ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(x + 3, y + 3, w, h);
+  housing(ctx, x, y, w, h);
+  ctx.fillStyle = '#1a1e24'; ctx.fillRect(x + 3, y + 3, w - 6, h - 6);
+  glowRect(ctx, x, y - 3, w, 3, d.color, 6);
   const n = f.cases.length, vis = Math.min(8, Math.ceil(n / 5));
-  for (let i = 0; i < vis; i++) { const cx = i % 4, cy = (i / 4) | 0; ctx.fillStyle = d.color; ctx.fillRect(x + 2 + cx * 6.5, y + 3 + cy * 8, 5.5, 6.5); }
-  if (n) badge(x + w, y - 2, String(n), '#1d4ed8');
+  for (let i = 0; i < vis; i++) { const cx = i % 4, cy = (i / 4) | 0; ctx.fillStyle = d.color; ctx.fillRect(x + 4 + cx * 5.5, y + 4 + cy * 6, 4.5, 5); }
+  if (n) badge(x + w, y - 2, String(n), '#14223a');
   const atHome = Math.abs(f.x - f.homeX) < 0.1 && Math.abs(f.y - f.homeY) < 0.1;
-  if (!atHome) label(ctx, d.id, f.x * T, y + h + 7, { font: 'bold 9px system-ui', outline: '#000' });
+  if (!atHome) label(ctx, d.id, f.x * T, y + h + 7, { font: PX(8), outline: '#000' });
 }
 
-function drawPerson(x, y, r, fill, stroke, text) {
-  ctx.beginPath(); ctx.arc(x * T, y * T, r, 0, Math.PI * 2);
-  ctx.fillStyle = fill; ctx.fill();
-  ctx.lineWidth = 2; ctx.strokeStyle = stroke; ctx.stroke(); ctx.lineWidth = 1;
-  if (text) label(ctx, text, x * T, y * T + 0.5, { font: 'bold 8px system-ui' });
+// ---- Pixel people ------------------------------------------------------
+const lastPos = new WeakMap();
+function stepPhase(e) {
+  const prev = lastPos.get(e), moving = prev && (Math.abs(prev.x - e.x) + Math.abs(prev.y - e.y)) > 0.0005;
+  let ph = prev ? prev.ph : 0;
+  if (moving) ph += 0.35;
+  lastPos.set(e, { x: e.x, y: e.y, ph });
+  return moving ? ph : null;
 }
+const SKIN = ['#f1c7a3', '#d9a07a', '#a86f4c', '#7a4a32', '#e8b48f'];
+const HAIR = ['#2b1d14', '#5a3a22', '#c99a4b', '#111', '#8a2f1f', '#d8d8d8'];
+// Draws a little top-down pixel figure centred at (x,y) tiles. u = pixel unit size.
+function pixelPerson(e, shirt, opts) {
+  opts = opts || {};
+  const u = opts.u || 2, cx = Math.round(e.x * T), cy = Math.round(e.y * T);
+  const seed = opts.seed || 0;
+  const ph = stepPhase(e);
+  const leg = ph == null ? 0 : Math.round(Math.sin(ph) * 1.5);
+  const bob = ph == null ? 0 : (Math.sin(ph * 2) > 0 ? -1 : 0);
+  // shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(cx, cy + 6 * u, 4 * u, 1.5 * u, 0, 0, Math.PI * 2); ctx.fill();
+  if (opts.ring) { ctx.save(); ctx.shadowColor = opts.ring; ctx.shadowBlur = 10; ctx.strokeStyle = opts.ring; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(cx, cy + 6 * u, 5.5 * u, 2.2 * u, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
+  const top = cy - 7 * u + bob;
+  const P = (gx, gy, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(cx + gx * u, top + gy * u, w * u, h * u); };
+  const pants = opts.pants || '#2a3140';
+  // legs
+  P(-2, 9, 2, 3 + leg, pants); P(0, 9, 2, 3 - leg, pants);
+  P(-2, 11 + leg, 2, 1, '#111'); P(0, 11 - leg, 2, 1, '#111');
+  // torso + arms
+  P(-3, 4, 6, 5, shirt); P(-3, 4, 6, 1, 'rgba(255,255,255,0.25)');
+  P(-4, 5 - leg * 0.5, 1, 3, shirt); P(3, 5 + leg * 0.5, 1, 3, shirt);
+  P(-4, 8 - leg * 0.5, 1, 1, SKIN[seed % SKIN.length]); P(3, 8 + leg * 0.5, 1, 1, SKIN[seed % SKIN.length]);
+  if (opts.vest) { P(-3, 4, 1, 5, opts.vest); P(2, 4, 1, 5, opts.vest); }
+  // head
+  P(-2, 0, 4, 4, SKIN[seed % SKIN.length]);
+  P(-2, 0, 4, 1, opts.hat || HAIR[(seed >> 2) % HAIR.length]);
+  if (opts.hat) P(-3, 1, 6, 1, opts.hat);
+  // eyes (facing down shows face, facing up shows hair)
+  if (e.fy < -0.5) P(-2, 1, 4, 2, HAIR[(seed >> 2) % HAIR.length]);
+  else { P(-1, 2, 1, 1, '#111'); P(1, 2, 1, 1, '#111'); }
+  return top;
+}
+const hash = s => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); };
+
 function drawCarry(x, y, carry) {
   carry.forEach((c, i) => {
-    ctx.fillStyle = DEPT[c.d].color; ctx.fillRect(x * T - 6 + i * 3, y * T - 24 - i * 6, 12, 8);
-    ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.strokeRect(x * T - 5.5 + i * 3, y * T - 23.5 - i * 6, 11, 7);
+    const bx = Math.round(x * T - 6 + i * 3), by = Math.round(y * T - 26 - i * 6);
+    ctx.fillStyle = DEPT[c.d].color; ctx.fillRect(bx, by, 12, 8);
+    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(bx, by, 12, 1);
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.strokeRect(bx + 0.5, by + 0.5, 11, 7);
   });
 }
 function drawProgress(x, y, p) {
-  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(x * T - 12, y * T + 13, 24, 4);
-  ctx.fillStyle = '#7ee0a1'; ctx.fillRect(x * T - 12, y * T + 13, 24 * clamp(p, 0, 1), 4);
+  const bx = Math.round(x * T - 12), by = Math.round(y * T + 15);
+  ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(bx - 1, by - 1, 26, 6);
+  glowRect(ctx, bx, by, 24 * clamp(p, 0, 1), 4, PAL.green, 6);
 }
 
 function drawCrew(c, r) {
   if (r.pallet) drawPallet(r.pallet, r.x + r.fx * 0.6, r.y + r.fy * 0.6);
-  const initials = c.name.split(' ').map(s => s[0]).join('');
-  drawPerson(r.x, r.y, 10, ROLES[c.role].color, '#fff', initials);
-  label(ctx, c.name.split(' ')[0], r.x * T, r.y * T - 16, { font: 'bold 9px system-ui', outline: 'rgba(0,0,0,0.8)' });
+  const role = ROLES[c.role];
+  const top = pixelPerson(r, role.color, { seed: hash(c.name), vest: 'rgba(0,0,0,0.25)' });
+  nameplate(ctx, c.name.split(' ')[0].toUpperCase(), r.x * T, top - 9, { font: PX(8), h: 12, edge: role.color });
   if (r.carry.length) drawCarry(r.x, r.y - 0.1, r.carry.slice(0, 4));
   if (r.progress > 0) drawProgress(r.x, r.y, r.progress);
 }
 
 function drawCustomer(cu) {
-  drawPerson(cu.x, cu.y, 7, cu.color, 'rgba(0,0,0,0.35)');
+  if (cu._seed == null) cu._seed = (Math.random() * 1000) | 0;
+  const top = pixelPerson(cu, cu.color, { seed: cu._seed, u: 1.5, pants: '#3a3f4a' });
   if (cu.emoteT > 0) {
-    ctx.fillStyle = '#fff'; rrect(ctx, cu.x * T - 9, cu.y * T - 24, 18, 13, 4); ctx.fill();
-    label(ctx, cu.emote, cu.x * T, cu.y * T - 17, { font: 'bold 9px system-ui', color: '#d00' });
+    ctx.fillStyle = '#fff'; ctx.fillRect(Math.round(cu.x * T - 9), Math.round(top - 16), 18, 12);
+    ctx.fillStyle = '#fff'; ctx.fillRect(Math.round(cu.x * T - 2), Math.round(top - 4), 4, 3);
+    label(ctx, cu.emote, cu.x * T, top - 9.5, { font: 'bold 9px system-ui', color: '#d00' });
   }
 }
 
 function drawVendor(n) {
-  drawPerson(n.x, n.y, 10, '#2f855a', '#c6f6d5', 'DSD');
+  const top = pixelPerson(n, '#2f855a', { seed: hash(n.v ? n.v.name : 'v'), hat: '#1f5c3d' });
   const v = n.v;
   if (v && v.state === 'waiting') {
     const left = 1 - (G.time - v.arrived) / VENDOR_PATIENCE;
-    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(n.x * T - 14, n.y * T - 20, 28, 4);
-    ctx.fillStyle = left > 0.5 ? '#7ee0a1' : left > 0.25 ? '#f0b429' : '#e5534b';
-    ctx.fillRect(n.x * T - 14, n.y * T - 20, 28 * clamp(left, 0, 1), 4);
-    label(ctx, v.name, n.x * T, n.y * T - 28, { font: 'bold 9px system-ui', outline: 'rgba(0,0,0,0.8)' });
-  }
+    nameplate(ctx, v.name.toUpperCase(), n.x * T, top - 16, { font: PX(8), h: 12, edge: PAL.green });
+    const bx = Math.round(n.x * T - 14), by = Math.round(top - 7);
+    ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(bx - 1, by - 1, 30, 6);
+    glowRect(ctx, bx, by, 28 * clamp(left, 0, 1), 4, left > 0.5 ? PAL.green : left > 0.25 ? '#f0b429' : '#e5534b', 6);
+  } else nameplate(ctx, 'DSD', n.x * T, top - 9, { font: PX(8), h: 12, edge: PAL.green });
 }
 
 function drawPlayer() {
   const p = G.player;
   if (p.pallet) drawPallet(p.pallet, p.x + p.fx * 0.7, p.y + p.fy * 0.7);
+  // facing chevron
+  ctx.save(); ctx.shadowColor = '#ffd34d'; ctx.shadowBlur = 8;
   ctx.beginPath();
-  ctx.moveTo(p.x * T + p.fx * 18, p.y * T + p.fy * 18);
-  ctx.lineTo(p.x * T + p.fx * 12 - p.fy * 5, p.y * T + p.fy * 12 + p.fx * 5);
-  ctx.lineTo(p.x * T + p.fx * 12 + p.fy * 5, p.y * T + p.fy * 12 - p.fx * 5);
-  ctx.closePath(); ctx.fillStyle = '#ffd34d'; ctx.fill();
-  drawPerson(p.x, p.y, 12, '#1e6fd9', '#ffd34d', 'YOU');
+  ctx.moveTo(p.x * T + p.fx * 20, p.y * T + 4 + p.fy * 20);
+  ctx.lineTo(p.x * T + p.fx * 14 - p.fy * 5, p.y * T + 4 + p.fy * 14 + p.fx * 5);
+  ctx.lineTo(p.x * T + p.fx * 14 + p.fy * 5, p.y * T + 4 + p.fy * 14 - p.fx * 5);
+  ctx.closePath(); ctx.fillStyle = '#ffd34d'; ctx.fill(); ctx.restore();
+  const top = pixelPerson(p, '#1e6fd9', { seed: 7, ring: '#ffd34d', vest: '#ffd34d' });
+  nameplate(ctx, 'YOU', p.x * T, top - 9, { font: PX(8), h: 12, edge: '#ffd34d', color: '#ffe9a0', bg: '#2a2208' });
   if (p.carry.length) drawCarry(p.x, p.y, p.carry);
   if (p.work) drawProgress(p.x, p.y + 0.15, p.work.t / p.work.dur);
 }
 
 function drawTrailer() {
   const x = 1.2 * T, y = 0.15 * T, w = 5.6 * T, h = 1.75 * T;
-  ctx.fillStyle = '#d9dde3'; ctx.fillRect(x, y, w, h);
-  ctx.strokeStyle = '#8a929e'; ctx.lineWidth = 2; ctx.strokeRect(x, y, w, h); ctx.lineWidth = 1;
+  housing(ctx, x, y, w, h);
+  ctx.fillStyle = '#1a1e24'; ctx.fillRect(x + 4, y + 18, w - 8, h - 22);
   for (let i = 0; i < Math.min(G.trailer.length, 10); i++) {
     ctx.fillStyle = G.trailer[i].cold ? '#6cc4ee' : '#b08a5a';
     ctx.fillRect(x + 8 + i * 17, y + h - 20, 14, 14);
   }
-  label(ctx, G.trailer.length ? `TRAILER · ${plural(G.trailer.length, 'pallet')}` : 'TRAILER EMPTY', x + w / 2, y + 14, { font: 'bold 12px system-ui', color: '#222' });
+  label(ctx, G.trailer.length ? `TRAILER · ${plural(G.trailer.length, 'pallet')}`.toUpperCase() : 'TRAILER EMPTY', x + w / 2, y + 10, { font: PX(8), color: '#14223a' });
 }
 
 function render() {
@@ -252,13 +478,15 @@ function render() {
   drawPlayer();
   RT.floaters.forEach(f => {
     ctx.globalAlpha = clamp(1.4 - f.t, 0, 1);
-    label(ctx, f.text, f.x * T, f.y * T, { font: 'bold 11px system-ui', color: f.color, outline: 'rgba(0,0,0,0.85)' });
+    label(ctx, f.text, f.x * T, f.y * T, { font: PX(10), color: f.color, outline: 'rgba(0,0,0,0.9)' });
     ctx.globalAlpha = 1;
   });
   if (G.phase === 'night') {
-    ctx.fillStyle = 'rgba(10,15,40,0.5)'; ctx.fillRect(T, 11 * T, (MW - 2) * T, 13 * T);
-    label(ctx, 'STORE CLOSED — night truck', 20 * T, 17 * T, { font: 'bold 18px system-ui', color: 'rgba(255,255,255,0.6)' });
+    ctx.fillStyle = 'rgba(5,10,30,0.6)'; ctx.fillRect(T, 11 * T, (MW - 2) * T, 13 * T);
+    label(ctx, 'STORE CLOSED · NIGHT TRUCK', 20 * T, 17 * T, { font: PX(18), color: 'rgba(66,215,255,0.7)', glow: PAL.cyan });
   } else if (G.phase === 'day' && G.time < OPEN) {
-    label(ctx, `Doors open at 7:00 AM`, 20 * T, 17 * T, { font: 'bold 16px system-ui', color: 'rgba(0,0,0,0.25)' });
+    label(ctx, 'DOORS OPEN AT 7:00 AM', 20 * T, 17 * T, { font: PX(16), color: 'rgba(66,215,255,0.35)', glow: PAL.cyan });
   }
+  if (!OVERLAY) OVERLAY = drawOverlay();
+  ctx.drawImage(OVERLAY, 0, 0);
 }
