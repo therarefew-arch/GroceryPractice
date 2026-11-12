@@ -72,7 +72,7 @@ const UI = {
 
   updateHUD() {
     const t = G.today;
-    $('h-day').textContent = `Day ${G.day}`;
+    $('h-day').textContent = dayLabel(G.day) + (isTruckNight(G.day) ? ' · 🚚' : '');
     $('h-time').textContent = fmtTime(G.time);
     $('h-phase').textContent = G.phase === 'night' ? 'Night truck' : G.phase === 'summary' ? 'Closed' : G.time < OPEN ? 'Pre-open' : 'Store open';
     $('h-sales').textContent = money(t.sales);
@@ -115,7 +115,7 @@ const UI = {
     const inStock = t.requests ? (1 - t.misses / t.requests) * 100 : 100;
     const pal = sum(G.pallets.map(p => p.cases.length)), onFl = sum(G.floats.map(f => f.cases.length));
     const card = (k, v, s, cls) => `<div class="card"><div class="k">${k}</div><div class="v ${cls || ''}">${v}</div><div class="s">${s || ''}</div></div>`;
-    let h = `<h2>Store Report — ${G.phase === 'night' ? `Night after Day ${G.day}` : `Day ${G.day}, ${fmtTime(G.time)}`}</h2><div class="cards">`;
+    let h = `<h2>Store Report — ${G.phase === 'night' ? `Night after Day ${G.day}` : `${dayLabel(G.day)}, ${fmtTime(G.time)}`}</h2><div class="cards">`;
     h += card('Sales today', money(t.sales), `Goal ${money(t.goal)} (${Math.round(t.sales / Math.max(1, t.goal) * 100)}%)`);
     h += card('Customers', t.customers, `${t.requests} shelf visits`);
     h += card('In-stock', inStock.toFixed(1) + '%', `${t.misses} empty-shelf walkaways`, inStock >= 97 ? 'good' : inStock >= 92 ? 'warn' : 'bad');
@@ -218,18 +218,21 @@ const UI = {
   setEndcap(id, v) { G.endcaps[id] = v || null; this.render(); },
 
   tab_order() {
-    const editable = G.phase === 'day';
+    const editable = orderOpen();
+    const td = nextTruckDay(G.phase === 'day' ? G.day : G.day + 1), cover = coverDays(td);
     const sug = suggestedOrder();
-    const cur = G.order || sug;
+    const cur = (G.order && G.day === td) ? G.order : sug;
     let h = `<h2>Forecast & Order</h2>`;
-    h += editable
-      ? `<p>Order for <b>tonight's truck</b> (it arrives after close and you work it tomorrow). ${G.orderSubmitted ? '<span class="good">✓ Submitted — you can still change and resubmit until close.</span>' : '<span class="warn">Not submitted yet. If you skip it, the system sends the suggested order at close.</span>'}</p>`
-      : `<p class="mute">Tonight's truck is already here. Ordering opens again tomorrow.</p>`;
-    h += `<table><tr><th>Department</th><th>Last 7 days (units)</th><th class="n">Avg/day</th><th class="n">Endcap lift</th><th class="n">Forecast tmrw</th><th class="n">On hand</th><th class="n">DSD/day</th><th class="n">Suggested</th><th class="n">Order (cs)</th></tr>`;
+    h += `<p class="mute">Truck nights: <b>${TRUCK_NIGHTS.join(', ')}</b>. Order window closes at <b>${fmtTime(ORDER_CUTOFF)}</b> on truck days.</p>`;
+    if (editable) h += `<p>Order for <b>tonight's truck</b> (${WEEKDAY_NAMES[dowIdx(td)]}). It has to cover <b>${cover} day${cover > 1 ? 's' : ''}</b> of sales (${Array.from({ length: cover }, (_, k) => dowOf(td + 1 + k)).join(', ')}). ${G.orderSubmitted ? '<span class="good">✓ Submitted. You can still change and resubmit until the cutoff.</span>' : `<span class="warn">Not submitted yet. Due by ${fmtTime(ORDER_CUTOFF)}.</span>`}</p>`;
+    else if (G.phase === 'day' && isTruckNight(G.day)) h += `<p class="warn">The order window closed at ${fmtTime(ORDER_CUTOFF)}. ${G.today.systemOrder ? 'The system order was sent.' : 'Your order is locked in.'}</p>`;
+    else h += `<p class="mute">No order due today. Next truck: <b>${WEEKDAY_NAMES[dowIdx(td)]} night</b> (covers ${cover} day${cover > 1 ? 's' : ''}). Preview below.</p>`;
+    h += `<table><tr><th>Department</th><th>Last 7 days (units)</th><th class="n">Avg/day</th><th class="n">Endcap lift</th><th class="n">Forecast (${cover}d)</th><th class="n">On hand</th><th class="n">DSD/day</th><th class="n">Suggested</th><th class="n">Order (cs)</th></tr>`;
     let tot = 0;
     for (const d of DEPTS) {
       const h7 = G.history[d.id].slice(-7);
-      const fc = forecastUnits(d.id), oh = onHandUnits(d.id), val = cur[d.id] || 0;
+      let fc = 0; for (let k = 1; k <= cover; k++) fc += forecastFor(d.id, td + k);
+      const oh = onHandUnits(d.id), val = cur[d.id] || 0;
       tot += val;
       h += `<tr><td><span class="dot" style="background:${d.color}"></span><span class="clickable" onclick="UI.drillTo('${d.id}')">${d.name}</span></td><td>${spark(h7)}</td>
         <td class="n">${Math.round(avgDemand(d.id))}</td><td class="n">${promoLift(d.id) > 1 ? '+' + Math.round((promoLift(d.id) - 1) * 100) + '%' : '—'}</td>
@@ -239,7 +242,7 @@ const UI = {
     }
     h += `<tr><td colspan="8" class="n"><b>Total</b> <span class="mute">(≈ ${Math.max(1, Math.ceil(tot / PALLET_SIZE))} pallets)</span></td><td class="n"><b id="ord-total">${tot}</b> cs</td></tr></table>`;
     if (editable) h += `<div class="row" style="margin-top:10px;justify-content:flex-end"><button onclick="UI.fillSuggested()">Use suggested</button><button class="primary" onclick="UI.submitOrder()">Submit order</button></div>`;
-    h += `<p class="mute">Suggested = forecast × 1.25 (safety stock) − (on hand − what you'll still sell today) − 80% of expected DSD, rounded up to cases. Forecast = 7-day average demand (sales + lost sales) × endcap lift. Click a department for item detail.</p>`;
+    h += `<p class="mute">Suggested = forecast for the days this truck covers + 25% of the first day (safety stock) − (on hand − what still sells before the truck) − 80% of expected DSD, rounded up to cases. Daily forecast = 7-day average demand (sales + lost sales) × endcap lift × day-of-week factor (${WEEKDAYS.map(w => w + ' ' + DOW_FACTOR[w]).join(', ')}). Click a department for item detail.</p>`;
     if (this.drill) {
       const d = DEPT[this.drill];
       const rows = d.items.map(([n]) => {
@@ -248,9 +251,10 @@ const UI = {
         return { n, hh, avg, trend: older ? recent / older - 1 : 0 };
       });
       const totAvg = sum(rows.map(r => r.avg)) || 1;
-      h += `<h3>Item forecast — ${d.name}</h3><table><tr><th>Item</th><th>Last 7 days</th><th class="n">Avg/day</th><th class="n">Share</th><th class="n">Trend</th><th class="n">Forecast tmrw</th><th class="n">≈ Cases</th></tr>` +
+      h += `<h3>Item forecast — ${d.name}</h3><table><tr><th>Item</th><th>Last 7 days</th><th class="n">Avg/day</th><th class="n">Share</th><th class="n">Trend</th><th class="n">Forecast (truck)</th><th class="n">≈ Cases</th></tr>` +
         rows.sort((a, b) => b.avg - a.avg).map(r => {
-          const share = r.avg / totAvg, fc = forecastUnits(d.id) * share;
+          let dfc = 0; for (let k = 1; k <= cover; k++) dfc += forecastFor(d.id, td + k);
+          const share = r.avg / totAvg, fc = dfc * share;
           const tr = Math.round(r.trend * 100);
           return `<tr><td>${r.n}</td><td>${spark(r.hh)}</td><td class="n">${r.avg.toFixed(1)}</td><td class="n">${(share * 100).toFixed(0)}%</td>
             <td class="n ${tr > 8 ? 'good' : tr < -8 ? 'bad' : 'mute'}">${tr > 0 ? '▲' : tr < 0 ? '▼' : ''}${Math.abs(tr)}%</td><td class="n">${fc.toFixed(1)}</td><td class="n">${(fc / d.upc).toFixed(1)}</td></tr>`;
@@ -265,6 +269,7 @@ const UI = {
   },
   fillSuggested() { G.order = suggestedOrder(); this.render(); },
   submitOrder() {
+    if (!orderOpen()) { toast('The order window is closed.', 'bad'); return; }
     if (!G.order) G.order = suggestedOrder();
     if (!G.orderSubmitted) addXP(15);
     G.orderSubmitted = true;
@@ -284,7 +289,7 @@ const UI = {
       <li>Cold (blue-outlined) pallets start spoiling at 9:00 AM if they're still in the back.</li>
       <li><b>10:00 PM</b> — Closing report. At night, pull pallets off the trailer into Receiving (or let overtime do it for a fee).</li></ol>
       <h3>Practice settings</h3>
-      <label><input type="checkbox" ${RT.settings.labels ? 'checked' : ''} onchange="UI.setLabels(this.checked)"> Show the aisle on case labels (turn off to test yourself on where items go)</label>
+      <label><input type="checkbox" ${RT.settings.labels ? 'checked' : ''} onchange="UI.setLabels(this.checked)"> Easy mode: show the aisle on case labels. Off by default, so you have to know where every item lives.</label>
       <h3>Save</h3><p class="mute">The game auto-saves in this browser every couple of in-game hours and at the start and end of each day.</p>
       <button class="danger" onclick="UI.newGameConfirm()">Start a new store</button>`;
   },
@@ -307,7 +312,7 @@ const UI = {
       <div class="row" style="justify-content:flex-end"><button class="primary" onclick="UI.hideModal()">Clock in for Day 1 →</button></div>`);
   },
   showContinue() {
-    this.showModal(`<h2>Welcome back</h2><p>Day ${G.day} · Level ${level()} ${title()} · Career bonus ${money(G.bank)}</p>
+    this.showModal(`<h2>Welcome back</h2><p>${dayLabel(G.day)} · Level ${level()} ${title()} · Career bonus ${money(G.bank)}</p>
       <div class="row" style="justify-content:flex-end"><button class="danger" onclick="UI.newGameConfirm()">Start over</button><button class="primary" onclick="UI.hideModal(); if (G.phase === 'summary') UI.showSummary(G.lastResult);">Continue</button></div>`);
   },
   newGameConfirm() {

@@ -61,6 +61,16 @@ const SHIFTS = {
   night: { name: 'Night 10:00p–5:00a', start: 1320, end: 1740 },
 };
 
+// ---- Calendar: store weeks run Saturday through Friday. Day 1 is a Saturday. ----
+const WEEKDAYS = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+const WEEKDAY_NAMES = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+// How busy each day is compared with an average day (should average 1.0).
+const DOW_FACTOR = { Sat: 1.25, Sun: 1.1, Mon: 0.85, Tue: 0.85, Wed: 0.9, Thu: 0.95, Fri: 1.1 };
+// Warehouse truck schedule: the nights a truck delivers (you work it the next morning).
+const TRUCK_NIGHTS = ['Sat', 'Mon', 'Wed', 'Thu'];
+// On a truck day the order must be in by this time, or the system's suggested order is sent.
+const ORDER_CUTOFF = 14 * 60; // 2:00 PM
+
 // Customer traffic weight by hour (store open 7am–10pm)
 const TRAFFIC = { 7: 0.5, 8: 0.7, 9: 0.8, 10: 0.9, 11: 1.1, 12: 1.3, 13: 1.1, 14: 1.0, 15: 1.0, 16: 1.3, 17: 1.6, 18: 1.5, 19: 1.1, 20: 0.8, 21: 0.5 };
 

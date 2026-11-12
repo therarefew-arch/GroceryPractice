@@ -1,6 +1,6 @@
 # Grocery Practice
 
-**Version 0.0.3**
+**Version 0.0.4**
 
 A 2D grocery store manager simulator for practicing the real job: receiving the night truck, building floats, working freight, keeping the shelves full, running the crew, and ordering for tomorrow. All without blowing the labor budget.
 
@@ -25,7 +25,11 @@ It's plain HTML/JavaScript, so there's no build step.
 | All day | Check in **DSD vendors** at the back door, hang **price tags**, fix **scan errors**, fill holes. |
 | Office | The computer has **Reports, Email, Crew & Schedule, Hiring, Display Planner, Forecast & Order**. |
 | 10:00 PM | Closing report with a letter grade, XP, a manager bonus, badges and coaching notes. |
-| Night | The truck you ordered arrives. Pull pallets off the trailer, or pay overtime to have it done. |
+| Night | On truck nights the truck you ordered arrives. Pull pallets off the trailer, or pay overtime to have it done. |
+
+**Weeks and trucks:** store weeks run Saturday to Friday (Day 1 is a Saturday). Weekends are busier, and forecasts use a day-of-week factor. Trucks only come on the nights in `TRUCK_NIGHTS`, and each order must cover the days until the next truck. On truck days the order window closes at `ORDER_CUTOFF` (2:00 PM by default). Miss it and the system order goes. Both settings are in `js/data.js`.
+
+**Hard mode by default:** cases show only the item name, so you need to know which aisle it belongs in. Turn on easy mode in Help & Settings to show the aisle.
 
 **Grading:** sales vs goal (30), in-stock % (25), labor % of sales ≤ 12% (20), truck worked by noon (15), price integrity (5), DSD check-ins (5).
 

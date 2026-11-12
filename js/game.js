@@ -8,7 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1320, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.3'; // bump the last number on every update
+const VERSION = '0.0.4'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -37,6 +37,18 @@ function fmtTime(m) {
   h = h % 12 || 12;
   return `${h}:${String(mm).padStart(2, '0')} ${ap}`;
 }
+// ---------- calendar ----------
+const dowIdx = day => (day - 1) % 7;
+const dowOf = day => WEEKDAYS[dowIdx(day)];
+const weekOf = day => Math.floor((day - 1) / 7) + 1;
+const dowFactor = day => DOW_FACTOR[dowOf(day)] || 1;
+const isTruckNight = day => TRUCK_NIGHTS.includes(dowOf(day));
+function nextTruckDay(day) { for (let d = day; d < day + 8; d++) if (isTruckNight(d)) return d; return day; }
+// Days of sales the order for truck night `td` has to cover (until the next truck's freight is worked).
+function coverDays(td) { return nextTruckDay(td + 1) - td; }
+const dayLabel = day => `Wk ${weekOf(day)} · ${dowOf(day)} · Day ${day}`;
+const orderOpen = () => G.phase === 'day' && isTruckNight(G.day) && G.time < ORDER_CUTOFF && !G.orderLocked;
+
 const money = n => (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString();
 const nid = () => G.nextId++;
 const caseUnits = c => (c.u != null ? c.u : DEPT[c.d].upc);
@@ -86,11 +98,17 @@ function trafficRemaining(t) {
 }
 function avgDemand(dept) { const h = G.history[dept].slice(-7); return sum(h) / h.length; }
 function forecastUnits(dept) { return avgDemand(dept) * promoLift(dept); }
+function forecastFor(dept, day) { return forecastUnits(dept) * dowFactor(day); }
 function dsdUnits(dept) { return sum(VENDORS.filter(v => v.dept === dept).map(v => v.cases * DEPT[dept].upc)); }
-function suggestedCases(dept) {
-  const d = DEPT[dept], f = forecastUnits(dept);
-  const stillToSell = G.phase === 'day' ? f * trafficRemaining(G.time) : 0;
-  const need = f * 1.25 - (onHandUnits(dept) - stillToSell) - dsdUnits(dept) * 0.8;
+function suggestedCases(dept, td) {
+  td = td || nextTruckDay(G.day);
+  const d = DEPT[dept], cover = coverDays(td);
+  let need = 0;
+  for (let k = 1; k <= cover; k++) need += forecastFor(dept, td + k);
+  // what will still sell between now and the truck night
+  let before = 0;
+  for (let k = G.day; k <= td; k++) before += forecastFor(dept, k) * (k === G.day ? (G.phase === 'day' ? trafficRemaining(G.time) : 0) : 1);
+  need += forecastFor(dept, td + 1) * 0.25 - (onHandUnits(dept) - before) - dsdUnits(dept) * 0.8 * cover;
   return Math.max(0, Math.ceil(need / d.upc));
 }
 function suggestedOrder() { const o = {}; DEPTS.forEach(d => { o[d.id] = suggestedCases(d.id); }); return o; }
@@ -218,14 +236,14 @@ function startDay() {
     labor: G.nightLabor, overtime: G.overtime, nightPallets: G.nightPallets, shrink: 0, spoiled: 0, scanLoss: 0,
     truckDoneAt: null, truckCases: truckRemaining(), tagsFixed: 0, vendorsIn: 0, vendorsMissed: 0,
     missorts: 0, youSorted: 0, youStocked: 0, xp: 0,
-    goal: Math.round(sum(DEPTS.map(d => forecastUnits(d.id) * d.price))),
+    goal: Math.round(sum(DEPTS.map(d => forecastFor(d.id, G.day) * d.price))),
   };
   G.nightLabor = 0; G.overtime = 0; G.nightPallets = 0;
   const nTags = 4 + (G.day % 3) * 2;
   for (let i = 0; i < nTags; i++) addTag('change');
   G.vendorsToday = VENDORS.map(v => ({ ...v, state: 'pending' }));
   G.candidates = [makeCandidate(), makeCandidate(), makeCandidate()];
-  G.order = null; G.orderSubmitted = false;
+  G.order = null; G.orderSubmitted = false; G.orderLocked = false;
   G.crew.forEach(c => {
     c.calledOut = G.day > 1 && Math.random() < 0.06;
     if (c.calledOut) mail(c.name, 'Can\'t make it in today', `Hey, I'm sick and can't make my ${SHIFTS[c.shift].name} shift today. Sorry!\n— ${c.name}`);
@@ -236,8 +254,12 @@ function startDay() {
     mail('District Manager', `Ad week: feature ${feat.map(d => DEPT[d].name).join(' & ')}`,
       `New ad starts today. Put ${feat.map(d => DEPT[d].name).join(' and ')} on at least 2 endcaps each (Display Planner on the office computer).\nEndcaps lift sales — make sure the shelves behind them stay full!`);
   }
-  mail('District Manager', `Day ${G.day} game plan`, [
-    'Morning! Here\'s today:',
+  const nt = nextTruckDay(G.day);
+  mail('District Manager', `${WEEKDAY_NAMES[dowIdx(G.day)]} game plan (${dayLabel(G.day)})`, [
+    `Morning! It's ${WEEKDAY_NAMES[dowIdx(G.day)]}, week ${weekOf(G.day)}. Here's today:`,
+    isTruckNight(G.day)
+      ? `  • TRUCK NIGHT: tonight's order is due by ${fmtTime(ORDER_CUTOFF)}. Miss it and the system order goes.`
+      : `  • No truck tonight. Next truck: ${WEEKDAY_NAMES[dowIdx(nt)]} night (order due ${fmtTime(ORDER_CUTOFF)} that day).`,
     `  • Sales goal: ${money(G.today.goal)}`,
     `  • Labor: ${LABOR_TARGET}% of sales or less`,
     `  • Truck: ${G.today.truckCases} cases — have it worked by noon`,
@@ -321,7 +343,7 @@ function computeResults() {
   if (t.missorts) tips.push(`You tried ${t.missorts} case(s) on the wrong float. Know your aisles: ${DEPTS.map(d => `${d.aisle} ${d.name}`).join(' · ')}.`);
   if (t.crewMistakes) tips.push(`Your crew made ${t.crewMistakes} mistake(s) and you coached ${t.coached || 0}. Coach right away: that's how rookies become superstars.`);
   if ((G.trash || []).length) tips.push(`${G.trash.length} piece(s) of cardboard are still on the floor. Messy aisles lower customer satisfaction every hour.`);
-  if (!G.orderSubmitted) tips.push('No order was submitted — the system order will be used. Review Forecast & Order before close to practice ordering.');
+  if (t.systemOrder) tips.push(`You missed the order window (${fmtTime(ORDER_CUTOFF)}) and the system order went instead. The system doesn't know your store: check Forecast & Order before the cutoff on every truck day.`);
   if (!tips.length) tips.push('Clean day. Try for a faster truck or tighter labor tomorrow.');
   const gradeXP = { A: 150, B: 100, C: 60, D: 30, F: 10 }[grade];
   return {
@@ -334,13 +356,15 @@ function computeResults() {
 function startNight() {
   G.phase = 'night';
   G.time = CLOSE;
-  if (!G.orderSubmitted) {
-    G.order = suggestedOrder();
-    mail('Replenishment System', 'System order transmitted', `No order was submitted for Day ${G.day}, so the suggested order was sent automatically (${sum(Object.values(G.order))} cases).`);
+  if (isTruckNight(G.day)) {
+    if (!G.orderSubmitted) { G.order = suggestedOrder(); G.today.systemOrder = true; }
+    G.trailer = buildTruck(G.order || suggestedOrder());
+    toast(`🚚 Truck's here: ${G.trailer.length} pallets. Pull them into Receiving at the dock doors (top-left), or press "End night".`, 'info');
+  } else {
+    G.trailer = [];
+    toast(`No truck tonight. Next truck: ${WEEKDAY_NAMES[dowIdx(nextTruckDay(G.day + 1))]} night. Press "End night" when you're ready.`, 'info');
   }
-  G.trailer = buildTruck(G.order || suggestedOrder());
-  G.orderSubmitted = true;
-  toast(`🚚 Truck's here: ${G.trailer.length} pallets. Pull them into Receiving at the dock doors (top-left), or press "End night".`, 'info');
+  G.orderSubmitted = true; G.orderLocked = true;
   save();
 }
 
@@ -381,6 +405,7 @@ function update(dt) {
     if (G.time >= CLOSE) { G.time = CLOSE; endDay(); return; }
     if (Math.floor(G.time / 60) !== Math.floor(prev / 60)) onHour(Math.floor(G.time / 60));
     spawnCustomers(gm);
+    orderWindowTick(prev);
     if (G.time > OPEN && G.time < CLOSE - 60 && Math.random() < gm / 140) {
       const before = G.tags.length;
       addTag('error');
@@ -396,6 +421,19 @@ function update(dt) {
     }
   } else if (G.time >= NIGHT_END) { endNight(); return; }
   updateCrew(dt, gm);
+}
+
+function orderWindowTick(prev) {
+  if (!isTruckNight(G.day) || G.orderLocked) return;
+  if (!G.orderSubmitted && prev < ORDER_CUTOFF - 60 && G.time >= ORDER_CUTOFF - 60) toast(`⏰ Order window closes at ${fmtTime(ORDER_CUTOFF)}: one hour left to submit tonight's order.`, 'warn');
+  if (G.time >= ORDER_CUTOFF) {
+    G.orderLocked = true;
+    if (!G.orderSubmitted) {
+      G.order = suggestedOrder(); G.orderSubmitted = true; G.today.systemOrder = true;
+      mail('Replenishment System', 'Order window closed: system order sent', `No order was submitted by ${fmtTime(ORDER_CUTOFF)}, so the suggested order was sent automatically (${sum(Object.values(G.order))} cases). You can't change it now.`);
+      toast('Order window closed. The system order was sent for you.', 'bad');
+    } else toast(`Order window closed. Your order (${sum(Object.values(G.order))} cs) is locked in.`, 'info');
+  }
 }
 
 function onHour(h) {
@@ -430,7 +468,7 @@ function spawnCustomers(gm) {
   if (G.time < OPEN || G.time > CLOSE - 20) return;
   const w = TRAFFIC[Math.floor(G.time / 60)] || 0;
   const satMult = clamp(0.7 + 0.3 * G.sat / 80, 0.7, 1.08);
-  RT.custAcc += CUST_PER_DAY * satMult * w / TRAFFIC_SUM / 60 * gm;
+  RT.custAcc += CUST_PER_DAY * dowFactor(G.day) * satMult * w / TRAFFIC_SUM / 60 * gm;
   while (RT.custAcc >= 1) { RT.custAcc -= 1; spawnCustomer(); }
 }
 
@@ -1088,7 +1126,7 @@ function boot() {
   document.title = 'Grocery Practice v' + VERSION;
   if (document.fonts) document.fonts.load(PX(8)).then(() => { BG = drawBG(); }).catch(() => {});
   UI.init();
-  try { RT.settings.labels = localStorage.getItem('groceryPractice.labels') !== 'off'; } catch (e) { /* ignore */ }
+  try { RT.settings.labels = localStorage.getItem('groceryPractice.labels') === 'on'; } catch (e) { /* ignore */ }
   if (load()) UI.showContinue();
   else { newGame(); UI.showWelcome(); }
   window.addEventListener('beforeunload', () => { if (G && (G.phase === 'day' || G.phase === 'night')) save(); });
