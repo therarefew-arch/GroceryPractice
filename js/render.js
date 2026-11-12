@@ -205,7 +205,6 @@ function drawBG() {
 
   // Conveyors (decor) along the receiving zone and float staging
   conveyor(g, 1 * T + 4, 9 * T + 11, 8 * T - 8, false);
-  conveyor(g, 10 * T + 4, 6 * T + 21, 15 * T - 8, false);
 
   // Receiving zone: amber hazard border
   g.save(); g.shadowColor = PAL.amber; g.shadowBlur = 8; g.strokeStyle = PAL.amber; g.setLineDash([6, 4]); g.lineWidth = 2;
@@ -220,7 +219,7 @@ function drawBG() {
 
   // Zone nameplates
   nameplate(g, 'RECEIVING', 5 * T, 3.55 * T, { edge: PAL.amber, color: '#ffe2a6', font: PX(8) });
-  nameplate(g, 'FLOAT STAGING', 17.5 * T, 4.2 * T, { font: PX(8) });
+  { const fs = MAPD.floatSpots, cx = sum(fs.map(s => s.x)) / fs.length + 0.5, cy = Math.min(...fs.map(s => s.y)); nameplate(g, 'FLOAT STAGING', cx * T, (cy - 0.8) * T, { font: PX(8) }); }
   nameplate(g, 'BACKSTOCK', 30.5 * T, 4.75 * T, { font: PX(8) });
   nameplate(g, 'OFFICE', 36.5 * T, 9.35 * T, { font: PX(8) });
   label(g, 'TRUCK YARD', 20 * T, 1 * T, { font: PX(14), color: '#ffcf70', glow: PAL.amber });

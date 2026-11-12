@@ -8,7 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1380, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.10'; // bump the last number on every update
+const VERSION = '0.0.11'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -203,6 +203,7 @@ function newGame() {
     const wsum = sum(d.items.map(i => i[1]));
     d.items.forEach(([n, w]) => { G.itemHistory[n] = G.history[d.id].map(u => Math.round(u * w / wsum * rand(0.85, 1.15))); });
   });
+  G.layout = null; ensureLayout();
   MAPD.floatSpots.forEach(s => G.floats.push({ id: nid(), dept: s.dept, x: s.x + 0.5, y: s.y + 0.5, homeX: s.x + 0.5, homeY: s.y + 0.5, cases: [], carriedBy: null, claimedBy: null, incoming: 0 }));
   MAPD.endcaps.forEach(e => { G.endcaps[e.id] = null; });
   G.endcaps[MAPD.endcaps[3].id] = 'A2';
@@ -1151,6 +1152,7 @@ function load() {
     G.crew.forEach(c => ensureMorale(ensureTrain(c, 40)));
     ensureLabor();
     ensureBackroom();
+    ensureLayout();
     if (!G.list && G.phase === 'day') G.list = buildChecklist();
     RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {};
     G.vendorsToday.forEach(v => {

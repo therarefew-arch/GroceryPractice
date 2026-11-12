@@ -35,7 +35,8 @@ const reloadUsed = () => Math.ceil(G.reload.pallets / STACK) + G.reload.bales;
 const reloadFree = () => RELOAD_SLOTS - reloadUsed();
 // Can one more empty pallet go on the stacks?
 const canStackEmpty = () => G.reload.pallets % STACK !== 0 || reloadFree() > 0;
-const nearReload = p => p.y > 7.6 && p.y < 9.2 && p.x > 0.8 && p.x < 9.2;
+const nearReload = p => RELOAD_TILES.some(t => Math.hypot(p.x - t.x - 0.5, p.y - t.y - 0.5) < 1.3);
+const workTiles = tiles => { const out = []; tiles.forEach(t => DIRS.forEach(([dx, dy]) => { if (walkable(t.x + dx, t.y + dy)) out.push({ x: t.x + dx, y: t.y + dy }); })); return out; };
 const nearBaler = p => Math.hypot(p.x - BALER.x - 0.5, p.y - BALER.y - 0.5) < 1.5;
 const inBackroom = p => p.y < 10 && p.x < 34;
 
@@ -158,14 +159,14 @@ function planBackroom(c, r) {
       goEnt(() => (G.empties.includes(e) ? e : null)),
       { wait: 0.6, label: 'Jacking empty' },
       { do: () => { if (!G.empties.includes(e)) return false; G.empties = G.empties.filter(x => x !== e); r.pallet = { id: e.id, empty: true, cases: [] }; return true; } },
-      { go: () => [{ x: 1 + (G.reload.pallets / STACK | 0) % 8, y: 8 }] },
+      { go: () => workTiles(RELOAD_TILES) },
       { wait: 0.5, label: 'Stacking' },
       { do: () => { if (stackEmpty()) r.pallet = null; else { r.pallet = null; G.empties.push({ id: e.id, x: r.x, y: r.y }); } RT.emptyClaim = null; return true; } },
     ];
   }
   if (G.baler >= BALE_SIZE && reloadFree() > 0) {
     r.intent = 'Making a bale';
-    return [{ go: () => [{ x: 10, y: 9 }, { x: 9, y: 8 }] }, { wait: 3, label: 'Baling' }, { do: () => { makeBale(false); return true; } }];
+    return [{ go: () => workTiles([BALER]) }, { wait: 3, label: 'Baling' }, { do: () => { makeBale(false); return true; } }];
   }
   if (G.dirt >= 60 && G.phase === 'day') {
     r.intent = 'Sweeping the backroom';
@@ -239,7 +240,8 @@ function drawBackroom() {
       ctx.fillStyle = '#ccc'; ctx.fillRect(px + 10, py + 5, 1, T - 9); ctx.fillRect(px + 20, py + 5, 1, T - 9);
     }
   });
-  label(ctx, `RELOAD ${reloadUsed()}/${RELOAD_SLOTS}`, 4.5 * T, 9.5 * T + 15, { font: PX(7), color: 'rgba(66,215,255,0.8)', outline: '#000' });
+  const rx = sum(RELOAD_TILES.map(t => t.x)) / RELOAD_TILES.length + 0.5, ry = Math.max(...RELOAD_TILES.map(t => t.y)) + 1;
+  label(ctx, `RELOAD ${reloadUsed()}/${RELOAD_SLOTS}`, rx * T, ry * T - 2, { font: PX(7), color: 'rgba(66,215,255,0.8)', outline: '#000' });
   // baler
   const bx = BALER.x * T, by = BALER.y * T, fill = clamp(G.baler / BALE_SIZE, 0, 1);
   ctx.fillStyle = '#2b3038'; ctx.fillRect(bx + 2, by + 2, T - 4, T - 4);

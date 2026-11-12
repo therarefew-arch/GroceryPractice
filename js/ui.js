@@ -104,7 +104,7 @@ const UI = {
     const main = this['tab_' + this.tab]();
     const unread = G.emails.filter(m => !m.read).length;
     const tabs = [['today', '📋 Today'], ['dash', '📊 Reports'], ['mail', `📧 Email${unread ? ` (${unread})` : ''}`], ['crew', '👥 Crew'], ['sched', `🗓 Schedule${dowOf(G.day) === 'Thu' && G.sched && G.sched[weekOf(G.day) + 1] && !G.sched[weekOf(G.day) + 1].posted ? ' (!)' : ''}`], ['labor', `📑 Labor${forecastOpen() ? ' (!)' : ''}`], ['hire', '🤝 Hiring'],
-      ['display', '🏷️ Display Planner'], ['order', '📈 Forecast & Order'], ['sir', `🛒 Special Items${(G.sirs || []).some(s => s.status === 'open') ? ' (!)' : ''}`], ['records', '🏆 Records'], ['help', '❓ Help & Settings']];
+      ['display', '🏷️ Display Planner'], ['order', '📈 Forecast & Order'], ['sir', `🛒 Special Items${(G.sirs || []).some(s => s.status === 'open') ? ' (!)' : ''}`], ['layout', '🧱 Backroom Layout'], ['records', '🏆 Records'], ['help', '❓ Help & Settings']];
     $('pc-tabs').innerHTML = tabs.map(([k, l]) => `<button class="${this.tab === k ? 'on' : ''}" onclick="UI.setTab('${k}')">${l}</button>`).join('') +
       `<div style="flex:1"></div><div class="mute" style="font-size:12px;padding:6px">The clock is paused while you're logged in.</div>`;
     $('pc-main').innerHTML = main;
@@ -438,6 +438,49 @@ const UI = {
   },
   drillTo(d) { this.drill = this.drill === d ? null : d; this.render(); },
 
+  tab_layout() {
+    const sel = this.laySel, st = layoutStats(), df = DEFAULT_STATS || st;
+    const cellCol = (ch, x, y) => {
+      const f = fixtureAt(x, y);
+      if (f === 'reload') return ['#6b4f33', 'R'];
+      if (f === 'baler') return ['#5d646d', 'B'];
+      if (f) return [DEPT[f].color, f];
+      return ({ '#': ['#0b0d10', ''], D: ['#3a2b0a', '⇡'], r: ['#2e2614', ''], b: ['#2b3038', '▤'], o: ['#22303a', ''], C: ['#22303a', '⌨'], v: ['#1f3b4a', '⇡'], '=': ['#1b4b5a', '⇣'], '~': ['#000', ''] })[ch] || ['#191d22', ''];
+    };
+    let grid = '<div style="overflow-x:auto"><div style="display:grid;grid-template-columns:repeat(' + MW + ',20px);gap:1px;width:max-content;background:#000;padding:2px">';
+    for (let y = 2; y <= 10; y++) for (let x = 0; x < MW; x++) {
+      const ch = MAPD.grid[y][x], [bg, tx] = cellCol(ch, x, y), f = fixtureAt(x, y);
+      const on = sel && f === sel;
+      grid += `<div onclick="UI.layClick(${x},${y})" title="${f ? fixtureName(f) : ''}" style="width:20px;height:20px;background:${bg};font:9px var(--pix);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;${on ? 'outline:2px solid #ffd34d;outline-offset:-2px;' : ''}">${tx}</div>`;
+    }
+    grid += '</div></div>';
+    const row = (name, a, b, why) => { const d = a - b, good = d < -0.4, bad = d > 0.4; return `<tr><td>${name}</td><td class="n"><b>${a.toFixed(1)}</b></td><td class="n mute">${b.toFixed(1)}</td><td class="n ${good ? 'good' : bad ? 'bad' : 'mute'}">${d > 0 ? '+' : ''}${d.toFixed(1)}</td><td class="mute">${why}</td></tr>`; };
+    let h = `<h2>🧱 Backroom Layout</h2><p class="mute">The store can't change shape, but the backroom is yours to arrange. Click a fixture (a float spot, <b>R</b> reload staging or <b>B</b> the baler), then click open floor to move it. Fixtures can't go on receiving (amber), the dock, doorways or the backstock rack aisle, and there has to be a path around everything.</p>`;
+    h += grid;
+    h += `<div class="row" style="margin:8px 0">${sel ? `<b>Moving: ${fixtureName(sel)}</b> · click where it should go${sel === 'reload' ? ' (top-left corner)' : ''} ` : '<span class="mute">Nothing selected.</span> '}${sel === 'reload' ? `<button onclick="UI.layTurn()">Turn into a ${(G.layout || defaultLayout()).reload.shape === 'block' ? '8×1 row' : '4×2 block'}</button> ` : ''}${sel ? '<button onclick="UI.laySel=null;UI.render()">Cancel</button> ' : ''}<button class="danger" onclick="UI.layReset()">Reset to the original layout</button></div>`;
+    h += `<h3>Walk distances (tiles)</h3><table><tr><th>Trip</th><th class="n">Now</th><th class="n">Original</th><th class="n">Change</th><th>Why it matters</th></tr>
+      ${row('Receiving → float → shelf', st.freight, df.freight, 'Every case makes this trip. Weighted by how much each department sells.')}
+      ${row('Receiving → baler', st.baler, df.baler, 'Cardboard comes off every pallet.')}
+      ${row('Receiving → reload staging', st.reload, df.reload, 'Every empty pallet goes here.')}
+      ${row('Dock → reload staging', st.dock, df.dock, 'Loading reloads onto the truck at night.')}</table>
+      <p class="mute">Shorter trips mean a faster truck and less labor. A good backroom puts the busiest departments' floats closest to the door to their aisle, and keeps the baler and reload staging next to receiving.</p>`;
+    return h;
+  },
+  layClick(x, y) {
+    const f = fixtureAt(x, y);
+    if (!this.laySel || (f && f !== this.laySel)) { if (f) this.laySel = f; else toast('Click a float spot, reload staging (R) or the baler (B) first.', 'info'); return this.render(); }
+    if (f === this.laySel && this.laySel !== 'reload') { this.laySel = null; return this.render(); }
+    const err = moveFixture(this.laySel, x, y);
+    if (err) toast(err, 'warn'); else { toast(`Moved: ${fixtureName(this.laySel)}.`, 'good'); this.laySel = null; }
+    this.render();
+  },
+  layTurn() {
+    const r = (G.layout || defaultLayout()).reload;
+    const err = moveFixture('reload', r.x, r.y, r.shape === 'block' ? 'row' : 'block');
+    if (err) toast(err, 'warn');
+    this.render();
+  },
+  layReset() { this.ask('Reset the backroom?', 'Every float spot, reload staging and the baler go back to where they started.', 'Reset', () => { resetLayout(); this.laySel = null; if (this.open) this.render(); }, true); },
   tab_help() {
     return `<h2>Help & Settings</h2>
       <h3>Controls</h3><p><kbd>WASD</kbd>/<kbd>Arrows</kbd> move · <kbd>Shift</kbd> run · <kbd>E</kbd>/<kbd>Space</kbd> interact · <kbd>P</kbd> pause · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> speed 1×/2×/4× · <kbd>Esc</kbd> leave the computer</p>

@@ -1,6 +1,6 @@
 # Grocery Practice
 
-**Version 0.0.10**
+**Version 0.0.11**
 
 A 2D grocery store manager simulator for practicing the real job: receiving the night truck, building floats, working freight, keeping the shelves full, running the crew, and ordering for tomorrow. All without blowing the labor budget.
 
@@ -59,6 +59,8 @@ It's plain HTML/JavaScript, so there's no build step.
 
 **Backroom upkeep:** every broken-down pallet leaves an empty on its receiving spot: jack it (E) and stack it in RELOAD STAGING (bottom-left, 8 slots, 15 empties a stack). Every case leaves cardboard in the baler; when it's full, make a bale (E at the baler) or cardboard ends up on the floor. Trucks take reloads at night only if they have room: last stop on the route takes everything, a middle stop takes a little, the first stop takes nothing (the morning email tells you tonight's stops). Load reloads at the dock after the trailer is empty; a Night Unloader does it for you. Sweep the backroom mid-day and after 9 PM. Straighten crooked floats (they slow the breakdown). Each aisle's bird holds 14 cases of backstock; past that it overflows onto the sales floor, blocks the aisle and costs satisfaction every hour. Breakdown and Night Unloader crew stack empties, bale and sweep when they have nothing better to do.
 
+**Backroom layout:** the store can't change shape, but you can rearrange the backroom (Office computer → 🧱 Backroom Layout). Move each department's float spot, reload staging (an 8×1 row or a 4×2 block) and the baler. Nothing can go on receiving, the dock, doorways or the backstock rack aisle, and there must be a path around everything. The tab shows walk distances (receiving → float → shelf, baler, reload staging, dock) against the original layout: shorter trips mean a faster truck.
+
 **Weekly DM review:** after Friday's close (weeks run Saturday to Friday) your District Manager grades the week. He is harsh but fair: for every problem he tells you what he saw, why it matters and what to do next week. Reviews also land in your email and on the Records tab.
 
 **Records board:** Office computer → 🏆 Records tracks your personal bests (best score, top sales, fastest truck, lowest labor %, best in-stock, lowest OOS count, longest B-or-better streak, most coaching in a day).
@@ -83,6 +85,7 @@ Everything store-specific lives in [`js/data.js`](js/data.js): departments/aisle
 | `js/events.js` | Special Item Requests, dated dairy, spills, coolers, DM walks, inspections, seasons |
 | `js/labor.js` | Weekly schedules, overtime, Monday forecast, labor demand, Labor Demand Exception report |
 | `js/backroom.js` | Empty pallets, baler & bales, reload staging, truck stop order, sweeping, crooked floats, bird overflow |
+| `js/layout.js` | Backroom layout: movable float spots, reload staging and baler, validation, walk distances |
 | `js/review.js` | Weekly DM review, records board, gamepad |
 | `js/ui.js` | HUD, office computer, modals |
 
