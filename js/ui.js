@@ -103,7 +103,7 @@ const UI = {
   render() {
     const main = this['tab_' + this.tab]();
     const unread = G.emails.filter(m => !m.read).length;
-    const tabs = [['today', '📋 Today'], ['dash', '📊 Reports'], ['mail', `📧 Email${unread ? ` (${unread})` : ''}`], ['crew', '👥 Crew & Schedule'], ['hire', '🤝 Hiring'],
+    const tabs = [['today', '📋 Today'], ['dash', '📊 Reports'], ['mail', `📧 Email${unread ? ` (${unread})` : ''}`], ['crew', '👥 Crew'], ['sched', `🗓 Schedule${dowOf(G.day) === 'Thu' && G.sched && G.sched[weekOf(G.day) + 1] && !G.sched[weekOf(G.day) + 1].posted ? ' (!)' : ''}`], ['labor', `📑 Labor${forecastOpen() ? ' (!)' : ''}`], ['hire', '🤝 Hiring'],
       ['display', '🏷️ Display Planner'], ['order', '📈 Forecast & Order'], ['sir', `🛒 Special Items${(G.sirs || []).some(s => s.status === 'open') ? ' (!)' : ''}`], ['records', '🏆 Records'], ['help', '❓ Help & Settings']];
     $('pc-tabs').innerHTML = tabs.map(([k, l]) => `<button class="${this.tab === k ? 'on' : ''}" onclick="UI.setTab('${k}')">${l}</button>`).join('') +
       `<div style="flex:1"></div><div class="mute" style="font-size:12px;padding:6px">The clock is paused while you're logged in.</div>`;
@@ -203,12 +203,11 @@ const UI = {
   openMail(id) { this.mailId = id; this.render(); },
 
   tab_crew() {
-    const hours = sh => (SHIFTS[sh].end - SHIFTS[sh].start) / 60;
-    let h = `<h2>Crew & Schedule</h2><p class="mute">Change roles and shifts any time — it takes effect right away. Crew slots: ${G.crew.length}/${maxCrew()} (level up for more). Team morale: <b style="color:${moodOf({ morale: teamMorale(), trait: 'quiet' }).col}">${Math.round(teamMorale())}%</b></p>`;
-    h += `<table><tr><th>Name</th><th>Role</th><th>Shift</th><th>Skill</th><th>Rank</th><th>Training</th><th>Morale</th><th class="n">Coached</th><th class="n">Days</th><th class="n">Wage</th><th>Right now</th><th></th></tr>`;
+    let h = `<h2>Crew</h2><p class="mute">Change roles any time. "Usual shift" changes their shift for the rest of this week and next week (days off stay off); set day-by-day shifts in 🗓 Schedule. Crew slots: ${G.crew.length}/${maxCrew()} (level up for more). Team morale: <b style="color:${moodOf({ morale: teamMorale(), trait: 'quiet' }).col}">${Math.round(teamMorale())}%</b></p>`;
+    h += `<table><tr><th>Name</th><th>Role</th><th>Usual shift</th><th>Skill</th><th>Rank</th><th>Training</th><th>Morale</th><th class="n">Coached</th><th class="n">Days</th><th class="n">Wage</th><th>Right now</th><th></th></tr>`;
     for (const c of G.crew) {
       const r = RT.crew[c.id];
-      const status = c.calledOut ? '<span class="bad">Called out</span>' : onShift(c) ? (r && r.inBuilding ? `<span class="good">${r.intent || 'On the clock'}</span>` : 'Clocking in') : '<span class="mute">Off the clock</span>';
+      const status = c.calledOut ? '<span class="bad">Called out</span>' : !curShift(c) ? '<span class="mute">Off today</span>' : onShift(c) ? (r && r.inBuilding ? `<span class="good">${r.intent || 'On the clock'}</span>` : 'Clocking in') : '<span class="mute">Off the clock</span>';
       h += `<tr><td><span class="dot" style="background:${ROLES[c.role].color}"></span>${esc(c.name)}</td>
         <td><select onchange="UI.setRole(${c.id},this.value)">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${k === c.role ? 'selected' : ''}>${v.name}</option>`).join('')}</select></td>
         <td><select onchange="UI.setShift(${c.id},this.value)">${Object.entries(SHIFTS).map(([k, v]) => `<option value="${k}" ${k === c.shift ? 'selected' : ''}>${v.name}</option>`).join('')}</select></td>
@@ -216,8 +215,9 @@ const UI = {
         <td style="white-space:nowrap">${c.lead ? '<span class="good">◆ Lead</span> ' : canPromote(c) ? `<button onclick="UI.promote(${c.id})">Promote</button> ` : ''}<button class="danger" onclick="UI.fire(${c.id})">Fire</button></td></tr>`;
     }
     h += '</table>';
-    const proj = sum(G.crew.filter(c => !c.calledOut && c.shift !== 'night').map(c => hours(c.shift) * c.wage));
-    const projN = sum(G.crew.filter(c => c.shift === 'night').map(c => hours(c.shift) * c.wage));
+    const tdy = G.crew.map(c => [c, curShift(c)]).filter(([c, k]) => k && !c.calledOut);
+    const proj = sum(tdy.filter(([, k]) => k !== 'night').map(([c, k]) => paidMin(k) / 60 * c.wage));
+    const projN = sum(tdy.filter(([, k]) => k === 'night').map(([c, k]) => paidMin(k) / 60 * c.wage));
     h += `<p>Scheduled day labor: <b>${money(proj)}</b> ≈ <b>${(proj / Math.max(1, G.today.goal) * 100).toFixed(1)}%</b> of today's sales goal. Night crew: <b>${money(projN)}</b> (charged to the next day). Target ≤ ${LABOR_TARGET}%.</p>`;
     h += `<h3>Training & coaching</h3><p class="mute">New hires make mistakes: wrong floats, cardboard left in aisles, wrong tags, short DSD deliveries, phone breaks. A red <b class="bad">!</b> appears over their head. Walk up and press <kbd>E</kbd> to coach them within 2 hours, or the mistake becomes a habit. Rookie → Trained → Pro → <b style="color:#ffd34d">★ Superstar</b> (85% trained, coached 8+ times, 3+ days on the job): 15% faster, no mistakes, and mentors rookies on their shift.</p>`;
     h += `<h3>Morale, conflicts & promotions</h3><p class="mute">Morale changes work speed (−15% when miserable, +5% when fired up) and call-outs. It goes up when you thank people (walk up and press <kbd>E</kbd>, once a day each), coach them, promote them and have good days. It goes down with shift changes, bad days, being ignored for 3+ days, unhandled arguments and unfair discipline. Below 20%, people give 3 days' notice: talk to them to turn it around. When an argument starts (orange <b style="color:#ff8c1a">!!</b>), walk over and press <kbd>E</kbd>: talk it out, split them up, write up, send home or let go. The right call depends on how serious it is and the person's write-up history. Pros and Superstars with 5+ days can be promoted to <b>◆ Lead</b> (+$${LEAD_RAISE.toFixed(2)}/hr, max ${MAX_LEADS}): leads work 5% faster, lift morale on their shift and calm arguments.</p>`;
@@ -246,7 +246,94 @@ const UI = {
     toast(r.good ? '🤝 Conflict handled well.' : '⚠ Conflict handled, but not well. Read the why.', r.good ? 'good' : 'warn');
   },
   setRole(id, role) { const c = G.crew.find(x => x.id === id); c.role = role; const r = RT.crew[id]; if (r && r.plan) finishPlan(c, r); this.render(); },
-  setShift(id, sh) { const c = G.crew.find(x => x.id === id); if (c.shift !== sh && (c.days || 0) > 0) bump(c, -4, 'schedule'); c.shift = sh; const r = RT.crew[id]; if (r && r.plan) finishPlan(c, r); this.render(); },
+  setShift(id, sh) {
+    const c = G.crew.find(x => x.id === id); if (!c || c.shift === sh) return;
+    const w = weekOf(G.day);
+    if ((c.days || 0) > 0 && schedFor(w).posted) bump(c, -4, 'schedule');
+    c.shift = sh;
+    [w, w + 1].forEach(wk => { const s = G.sched && G.sched[wk]; if (!s || !s.rows[id]) return; s.rows[id] = s.rows[id].map((v, i) => v === OFF || (wk === w && i < dowIdx(G.day)) ? v : sh); });
+    const r = RT.crew[id]; if (r && r.plan) finishPlan(c, r); this.render();
+  },
+  tab_sched() {
+    const cw = weekOf(G.day), w = this.schedWeek === cw + 1 ? cw + 1 : cw;
+    const s = schedFor(w), ws = weekStart(w), ti = w === cw ? dowIdx(G.day) : -1;
+    let h = `<h2>🗓 Schedule</h2><div class="row">${[cw, cw + 1].map(x => `<button class="${x === w ? 'primary' : ''}" onclick="UI.schedWeek=${x};UI.render()">Week ${x} (${x === cw ? 'this week' : 'next week'})</button>`).join(' ')}</div>`;
+    h += `<p class="mute">Week ${w}: ${fmtMD(ws)} to ${fmtMD(ws + 6)} · ${s.posted ? `<span class="good">Posted${s.postedBy === 'auto' ? ' (auto-posted)' : ''}</span>. Changes now cost that person's morale.` : `<span class="warn">Not posted.</span> Post it by Thursday ${fmtTime(SCHED_CUTOFF)}; after that, every change costs morale.`} Paid hours = shift length minus a 1-hour unpaid lunch on shifts over 6 hours. Over 40 paid hours in a week is overtime (1.5x).</p>`;
+    const opt = (v, cur) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${v === OFF ? '— Off —' : SHIFTS[v].name}</option>`;
+    h += `<div style="overflow-x:auto"><table style="font-size:15px"><tr><th>Name</th>${WEEKDAYS.map((d, i) => `<th${i === ti ? ' style="color:#fff3d6"' : ''}>${d} ${fmtMD(ws + i)}${i === ti ? ' ◀' : ''}</th>`).join('')}<th class="n">Hrs</th></tr>`;
+    for (const c of G.crew) {
+      const row = s.rows[c.id], hrs = weekPaidMin(w, c) / 60;
+      h += `<tr><td style="white-space:nowrap"><span class="dot" style="background:${ROLES[c.role].color}"></span>${esc(c.name)}<div class="mute" style="font-size:12px">${ROLES[c.role].name} · ${LD_ROWS.find(r => r.key === roleRow(c.role)).name}</div></td>` +
+        row.map((v, i) => `<td><select style="font-size:14px;max-width:118px${v === OFF ? ';color:#7a6a50' : ''}" ${i < ti ? 'disabled' : ''} onchange="UI.schedSet(${w},${c.id},${i},this.value)">${opt(OFF, v)}${Object.keys(SHIFTS).map(k => opt(k, v)).join('')}</select></td>`).join('') +
+        `<td class="n ${hrs > 40 ? 'bad' : ''}"><b>${hrs.toFixed(0)}</b>${hrs > 40 ? ' OT' : ''}</td></tr>`;
+    }
+    const sc = scheduledByRow(w), dd = WEEKDAYS.map((_, i) => dayDemand(ws + i));
+    const schD = WEEKDAYS.map((_, i) => sum(LD_ROWS.map(r => sc[r.key][i]))), dmD = dd.map(d => sum(LD_ROWS.map(r => d[r.key])));
+    const closers = WEEKDAYS.map((_, i) => G.crew.filter(c => s.rows[c.id] && s.rows[c.id][i] === 'close').length);
+    h += `<tr><td><b>Scheduled hrs</b></td>${schD.map(x => `<td class="n">${x.toFixed(2)}</td>`).join('')}<td class="n"><b>${sum(schD).toFixed(2)}</b></td></tr>`;
+    h += `<tr><td><b>Labor demand</b></td>${dmD.map(x => `<td class="n">${x.toFixed(2)}</td>`).join('')}<td class="n"><b>${sum(dmD).toFixed(2)}</b></td></tr>`;
+    h += `<tr><td><b>Diff</b> <span class="mute">(sched − dmd)</span></td>${schD.map((x, i) => `<td class="n ${ldFlag(dmD[i], x) ? (x > dmD[i] ? 'warn' : 'bad') : 'good'}">${ldNum(x - dmD[i])}</td>`).join('')}<td class="n ${ldFlag(sum(dmD), sum(schD)) ? 'bad' : 'good'}"><b>${ldNum(sum(schD) - sum(dmD))}</b></td></tr>`;
+    h += `<tr><td><b>Closers</b> <span class="mute">(rule: ${CLOSERS_REQUIRED})</span></td>${closers.map(n => `<td class="n ${n >= CLOSERS_REQUIRED ? 'good' : 'mute'}">${n}</td>`).join('')}<td></td></tr></table></div>`;
+    h += '<div class="row" style="margin-top:10px">';
+    if (!s.posted) h += `<button class="primary" onclick="UI.schedPost(${w})">Post week ${w} schedule</button> `;
+    if (!s.posted && w > cw) h += `<button onclick="UI.schedCopy(${w})">Copy this week's schedule</button> <button onclick="UI.schedReset(${w})">Reset to usual shifts</button>`;
+    h += `</div><p class="mute">Labor demand comes from the week's forecast (📑 Labor). It's earned by the work: truck cases, sales, DSD vendors, price tags and the ad flip. Red diff = short on hours, amber = over by more than 2 hours or 10%. Match each day, not just the week: a heavy truck day needs the hours that day.</p>`;
+    return h;
+  },
+  schedSet(w, id, i, v) { setSched(w, id, i, v); this.render(); },
+  schedPost(w) { postSchedule(w); this.render(); },
+  schedCopy(w) { const src = schedFor(w - 1), dst = schedFor(w); if (dst.posted) return; G.crew.forEach(c => { if (src.rows[c.id]) dst.rows[c.id] = src.rows[c.id].slice(); }); this.render(); },
+  schedReset(w) { const dst = schedFor(w); if (dst.posted) return; G.crew.forEach((c, i) => { dst.rows[c.id] = defaultRow(c, i); }); this.render(); },
+  tab_labor() {
+    const cw = weekOf(G.day), nf = G.fc && G.fc[cw + 1];
+    let h = '<h2>📑 Labor</h2>';
+    if (nf && !nf.locked && forecastOpen()) {
+      const ws = weekStart(cw + 1), sea = seasonOfWeek(cw + 1);
+      const act = day => { const p = G.pastDays.find(x => x.day === day); return p ? money(p.sales) : '<span class="mute">—</span>'; };
+      h += `<div class="card" style="margin:8px 0"><h3 style="margin-top:0">Forecast week ${cw + 1} (${fmtMD(ws)} to ${fmtMD(ws + 6)}) · <span class="warn">window closes ${fmtTime(FORECAST_CUTOFF)} today</span></h3>
+        <p class="mute">The system forecast is last week's average times the day-of-week pattern. Adjust each day by percent for what the system can't see.${sea ? ` <b class="warn">Next week: ${sea.name}</b> (${esc(sea.tip)})` : ''}</p>
+        <table><tr><th>Day</th><th class="n">Last week actual</th><th class="n">This week actual</th><th class="n">System</th><th class="n">Your adj %</th><th class="n">Your forecast</th></tr>`;
+      for (let i = 0; i < 7; i++) {
+        const d = ws + i;
+        h += `<tr><td>${WEEKDAYS[i]} ${fmtMD(d)}</td><td class="n">${act(d - 14)}</td><td class="n">${act(d - 7)}</td><td class="n">${money(nf.sys[i])}</td><td class="n"><input type="number" step="1" min="-50" max="100" value="${nf.adj[i]}" onchange="UI.fcAdj(${i},this.value)"></td><td class="n"><b>${money(fcSales(nf, d))}</b></td></tr>`;
+      }
+      h += `<tr><td><b>Week</b></td><td></td><td></td><td class="n">${money(sum(nf.sys))}</td><td></td><td class="n"><b>${money(sum(WEEKDAYS.map((_, i) => fcSales(nf, ws + i))))}</b></td></tr></table>
+        <div class="row" style="margin-top:8px"><button class="primary" onclick="UI.fcSubmit()">Submit forecast</button> <span class="mute">The report below updates as you adjust.</span></div></div>`;
+    } else if (nf && nf.locked) h += `<p class="mute">Week ${cw + 1} forecast: <b>${nf.by === 'you' ? 'submitted by you' : 'system forecast (window missed)'}</b>. Next forecast: Monday by ${fmtTime(FORECAST_CUTOFF)}.</p>`;
+    else h += `<p class="mute">Every Monday you forecast next week's sales (window closes ${fmtTime(FORECAST_CUTOFF)}). Your forecast earns next week's labor demand.</p>`;
+    const weeks = Object.keys(G.fc || {}).map(Number).filter(x => x >= cw - 3 && x <= cw + 1).sort((a, b) => a - b);
+    const w = weeks.includes(this.ldWeek) ? this.ldWeek : (nf ? cw + 1 : cw);
+    h += `<div class="row">${weeks.map(x => `<button class="${x === w ? 'primary' : ''}" onclick="UI.ldWeek=${x};UI.render()">Week ${x}${x === cw ? ' (this week)' : x === cw + 1 ? ' (next week)' : ''}</button>`).join(' ')}</div>`;
+    h += this.ldReportHTML(exceptionReport(w));
+    h += `<h3>How demand is earned</h3><table style="font-size:15px">
+      <tr><td>GR-HV-LV-DSD</td><td class="mute">Forecast dry truck cases (HV, LV, KeHe) ÷ ${STD.dryCPH} cases/hr. Counts Truck Breakdown, Freight Pusher, HBC Clerk and Night Unloader hours.</td></tr>
+      <tr><td>GR-Dairy / GR-Frozen</td><td class="mute">Forecast cold truck cases ÷ ${STD.coldCPH} cases/hr, plus ${STD.dairyDaily} / ${STD.frozenDaily} hrs a day for code checks, rotation and holes.</td></tr>
+      <tr><td>GR-HV-LV-DSD-RPLN</td><td class="mute">Forecast units sold ÷ ${STD.rplnUnitsPH} per hour (at least ${STD.rplnMin} hrs). Replenishment and closers.</td></tr>
+      <tr><td>GR-DSD Receiving</td><td class="mute">${STD.dsdPerVendor} hr per scheduled DSD vendor.</td></tr>
+      <tr><td>GR-Scan Price</td><td class="mute">${STD.tagHrs} hr per price change tag, + ${STD.adFlip} hrs Tuesday (ad flip) and ${STD.adVerify} hr Wednesday (ad verify).</td></tr>
+      <tr><td>Weekly roles</td><td class="mute">Mgr, POG, FS Sampling, Misc and Train earn hours for the week only. Train = 4 hrs per new hire.</td></tr></table>`;
+    return h;
+  },
+  fcAdj(i, v) { const f = G.fc[weekOf(G.day) + 1]; if (!f || f.locked) return; f.adj[i] = clamp(Math.round(+v || 0), -50, 100); this.render(); },
+  fcSubmit() { lockForecast(weekOf(G.day) + 1, 'you'); this.render(); },
+  ldReportHTML(r) {
+    const ws = r.from, cell = (v, b) => `<td class="n">${b ? '<b>' : ''}${v}${b ? '</b>' : ''}</td>`;
+    let h = `<div class="card" style="margin:10px 0;overflow-x:auto"><div style="font:700 12px var(--pix);color:var(--acc)">Labor Demand Exception</div>
+      <div class="mute" style="font-size:14px">Location: GP-01 - Practice Store - ${fmtMDY(r.from)} to ${fmtMDY(r.to)} · Department: Grocery · Demand from: ${r.fc ? (r.fc.locked ? (r.fc.by === 'you' ? 'your forecast' : 'the system forecast') : 'your forecast (not submitted yet)') : 'system'}</div>
+      <table style="font-size:12px;white-space:nowrap"><tr><th>Role</th>${WEEKDAYS.map((d, i) => `<th colspan="3" style="text-align:center">${d} ${fmtMD(ws + i)}</th>`).join('')}<th colspan="3" style="text-align:center">Total</th></tr>
+      <tr><th></th>${'<th class="n">Dmd</th><th class="n">Sched</th><th class="n">Diff</th>'.repeat(8)}</tr>`;
+    for (const row of r.rows) {
+      const b = !!row.total;
+      h += `<tr${b ? ' style="background:#ffb23812"' : ''}><td>${b ? '<b>' + row.name + '</b>' : row.name}</td>`;
+      for (let i = 0; i < 7; i++) {
+        if (row.weekly || row.weeklyTot) h += '<td></td><td></td><td></td>';
+        else h += cell(row.dmd[i].toFixed(2), b) + cell(row.sch[i].toFixed(2), b) + cell(ldNum(row.sch[i] - row.dmd[i]), b);
+      }
+      const flag = ldFlag(row.tD, row.tS);
+      h += cell(row.tD.toFixed(2), b) + cell(row.tS.toFixed(2), b) + `<td class="n ${flag ? (row.tS < row.tD ? 'bad' : 'warn') : ''}">${flag || b ? '<b>' : ''}${ldNum(row.tS - row.tD)}${flag || b ? '</b>' : ''}</td></tr>`;
+    }
+    return h + '</table><div class="mute" style="font-size:13px;margin-top:4px">Diff = Sched − Dmd. Bold weekly diff = exception (off by more than 2 hours or 10%). These roles only earn hours for the week: Mgr, POG, FS Sampling, Misc, Train.</div></div>';
+  },
   fire(id) {
     const c = G.crew.find(x => x.id === id);
     if (!confirm(`Let ${c.name} go? This can't be undone.\nWrite-ups on file: ${c.strikes || 0}. Firing without documentation hurts team morale.`)) return;
@@ -257,7 +344,7 @@ const UI = {
 
   tab_hire() {
     const full = G.crew.length >= maxCrew();
-    let h = `<h2>Hiring</h2><p class="mute">New applicants every morning. ${full ? '<span class="warn">All crew slots are full — let someone go or level up.</span>' : `Open slots: ${maxCrew() - G.crew.length}.`} You can change a hire's role and shift later in Crew & Schedule.</p><div class="cand">`;
+    let h = `<h2>Hiring</h2><p class="mute">New applicants every morning. ${full ? '<span class="warn">All crew slots are full — let someone go or level up.</span>' : `Open slots: ${maxCrew() - G.crew.length}.`} You can change a hire's role and shift later in Crew and 🗓 Schedule.</p><div class="cand">`;
     h += G.candidates.map(c => `<div class="card"><div class="v" style="font-size:16px">${esc(c.name)}</div><div><span class="dot" style="background:${ROLES[c.role].color}"></span>${ROLES[c.role].name}</div>
       <div class="s" style="margin:4px 0">${ROLES[c.role].desc}</div><div>${stars(c.skill)} · <b>$${c.wage.toFixed(2)}/hr</b></div><div class="s">Training: ${c.exp != null ? c.exp : 0}% · new hires need coaching</div><div class="s">Wants: ${SHIFTS[c.shift].name}</div>
       <button class="primary" ${full ? 'disabled' : ''} onclick="UI.hire(${c.id})" style="margin-top:8px">Hire</button></div>`).join('') || '<p class="mute">No applicants left today. Check back tomorrow.</p>';
@@ -269,6 +356,7 @@ const UI = {
     const k = G.candidates.find(x => x.id === id);
     G.candidates = G.candidates.filter(x => x !== k);
     G.crew.push(ensureMorale(ensureTrain({ id: k.id, name: k.name, role: k.role, shift: k.shift, skill: k.skill, wage: k.wage, calledOut: false }, k.exp != null ? k.exp : hireTrainingBase(k.skill))));
+    schedNewHire(G.crew[G.crew.length - 1]);
     toast(`Hired ${k.name} as ${ROLES[k.role].name} (${SHIFTS[k.shift].name}).`, 'good');
     this.render();
   },

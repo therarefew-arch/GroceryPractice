@@ -177,8 +177,8 @@ function drawCrewTooltip() {
     lines.push({ t: TRAIN_AREAS[k].name, bar: v, f: TIP_S, col: v >= 85 ? '#ffd34d' : v >= 50 ? '#57f287' : '#ff9f6b' });
   }
   if (c.needsCoach) lines.push({ t: `⚠ Needs coaching: ${TRAIN_AREAS[c.needsCoach.area].mistake}`, f: TIP, col: '#ff5a4e' });
-  const sh = SHIFTS[c.shift];
-  lines.push({ t: `${sh ? sh.name : c.shift} · Skill ${'★'.repeat(c.skill)}${'☆'.repeat(5 - c.skill)} · $${(+c.wage || 0).toFixed(2)}/hr`, f: TIP_S, col: '#b08a52' });
+  const sh = SHIFTS[curShift(c)];
+  lines.push({ t: `${sh ? sh.name : 'Off today'} · Skill ${'★'.repeat(c.skill)}${'☆'.repeat(5 - c.skill)} · $${(+c.wage || 0).toFixed(2)}/hr`, f: TIP_S, col: '#b08a52' });
 
   let w = 0;
   const BAR_X = 130, BAR_W = 90;

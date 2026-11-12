@@ -33,13 +33,15 @@ const TASK_CHECK = {
   blitz: () => DEPTS.every(d => shelfPct(d.id) >= 0.4),
   adflip: () => !!G.nextAd && G.nextAd.every(d => endcapCount(d) >= 2),
   adverify: () => !!G.ad && G.ad.depts.every(d => endcapCount(d) >= 2 && shelfPct(d) >= 0.6),
-  closers: () => G.crew.filter(c => c.shift === 'close' && !c.calledOut).length >= CLOSERS_REQUIRED,
+  closers: () => G.crew.filter(c => curShift(c) === 'close' && !c.calledOut).length >= CLOSERS_REQUIRED,
   truck10: () => !!G.today.truckDoneAt && G.today.truckDoneAt <= 600,
   labor: a => G.today.sales > 0 && G.today.labor / G.today.sales * 100 <= a.pct,
   coach: a => (G.today.coached || 0) >= a.n,
   noOuts: a => !(G.today.lost[a.dept] > 0),
   clean: () => !(G.trash || []).length,
   codes: a => !codesNeedWork(a.dept),
+  forecast: () => { const f = G.fc && G.fc[weekOf(G.day) + 1]; return !!f && f.by === 'you'; },
+  schedule: () => { const s = G.sched && G.sched[weekOf(G.day) + 1]; return !!s && s.posted && s.postedBy === 'you'; },
 };
 
 function buildChecklist() {
@@ -51,6 +53,8 @@ function buildChecklist() {
   (BACKSTOCK_RUNS[dow] || []).forEach(d => add('bs-' + d, 'backstock', `Backstock run: ${DEPT[d].aisle} birds`, 'Work backstock to the shelf by noon', 720, 'by', { dept: d }));
   const trucks = lastNightTrucks();
   add('invoices', 'invoices', `Invoices closed: ${trucks.join(', ')} + DSD`, 'Office computer → Today. A truck closes once its freight is worked', 1370, 'by');
+  if (dow === 'Mon') add('forecast', 'forecast', 'Forecast next week', `Office computer → Labor. Window closes ${fmtTime(FORECAST_CUTOFF)}`, FORECAST_CUTOFF, 'by');
+  if (dow === 'Thu') add('schedule', 'schedule', 'Post next week\'s schedule', 'Check it against labor demand first (Schedule + Labor tabs)', SCHED_CUTOFF, 'by');
   if (dow === 'Mon' && G.nextAd) add('adplan', 'adflip', 'Plan spots for tomorrow\'s ad chart', `New ad: ${G.nextAd.map(d => DEPT[d].name).join(' & ')}`, 1375, 'at');
   if (dow === 'Tue' && G.nextAd) add('adflip', 'adflip', 'Ad flip tonight', `Set 2 endcaps each for ${G.nextAd.map(d => DEPT[d].name).join(' & ')} before close`, 1375, 'at');
   if (dow === 'Wed' && G.ad) add('adverify', 'adverify', 'Verify the new ad', 'Ad endcaps up and those shelves 60%+ by noon', 720, 'at');

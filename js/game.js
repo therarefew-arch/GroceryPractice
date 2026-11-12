@@ -8,7 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1380, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.8'; // bump the last number on every update
+const VERSION = '0.0.9'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -250,9 +250,10 @@ function startDay() {
   G.vendorsToday = VENDORS.map(v => ({ ...v, state: 'pending' }));
   G.candidates = [makeCandidate(), makeCandidate(), makeCandidate()];
   G.order = null; G.orderSubmitted = false; G.orderLocked = false; G.conflict = null;
+  laborStartDay();
   G.crew.forEach(c => {
-    c.calledOut = G.day > 1 && Math.random() < calloutChance(ensureMorale(c));
-    if (c.calledOut) mail(c.name, 'Can\'t make it in today', `Hey, I'm sick and can't make my ${SHIFTS[c.shift].name} shift today. Sorry!\n— ${c.name}`);
+    c.calledOut = G.day > 1 && !!curShift(c) && Math.random() < calloutChance(ensureMorale(c));
+    if (c.calledOut) mail(c.name, 'Can\'t make it in today', `Hey, I'm sick and can't make my ${SHIFTS[curShift(c)].name} shift today. Sorry!\n— ${c.name}`);
   });
   const dowNow = dowOf(G.day);
   if (!G.ad && G.day === 1) G.ad = { depts: shuffle(DEPTS.map(d => d.id)).slice(0, 2), from: 1 };
@@ -307,7 +308,7 @@ function endDay() {
   res.badges.forEach(b => { G.badges[b] = (G.badges[b] || 0) + 1; });
   G.bank += res.bonus;
   addXP(res.xp);
-  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res) });
+  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res), ...laborDayExtras() });
   if (G.pastDays.length > 30) G.pastDays.shift();
   updateRecords(G.pastDays[G.pastDays.length - 1]);
   if (dowOf(G.day) === 'Fri') {
@@ -428,6 +429,7 @@ function update(dt) {
     listTick();
     conflictTick(gm);
     eventsTick(prev, gm);
+    laborTick();
     if (G.time > OPEN && G.time < CLOSE - 60 && Math.random() < gm / 140) {
       const before = G.tags.length;
       addTag('error');
@@ -630,7 +632,8 @@ function rt(c) {
 const sf = c => (0.7 + 0.12 * c.skill) * (isStar(c) ? 1.15 : 1) * moraleSpeed(c);
 function onShift(c) {
   if (c.calledOut || c.sentHome === G.day) return false;
-  const s = SHIFTS[c.shift];
+  const sk = curShift(c); if (!sk) return false;
+  const s = SHIFTS[sk];
   return G.time >= s.start && G.time < s.end;
 }
 
@@ -895,13 +898,13 @@ function updateCrew(dt, gm) {
   for (const c of G.crew) {
     const r = rt(c), on = onShift(c);
     ensureTrain(c); trainingTick(c);
-    if (on && !r.onBreak) { if (G.phase === 'night') G.nightLabor += c.wage * gm / 60; else G.today.labor += c.wage * gm / 60; }
+    if (on && !r.onBreak) { const pay = c.wage * otRate(c, gm) * gm / 60; if (G.phase === 'night') G.nightLabor += pay; else G.today.labor += pay; }
     if (!r.inBuilding) {
       if (r.plan) finishPlan(c, r);
       if (on) { r.inBuilding = true; r.x = MAPD.staffDoor.x + 0.5; r.y = MAPD.staffDoor.y + 0.5; }
       continue;
     }
-    const shf = SHIFTS[c.shift], slen = shf ? shf.end - shf.start : 0;
+    const shf = SHIFTS[curShift(c)], slen = shf ? shf.end - shf.start : 0;
     if (on && !r.plan && slen > 360 && c.breakDay !== G.day && G.phase === 'day' && G.time >= shf.start + slen / 2 - 30) {
       c.breakDay = G.day; r.intent = 'Going on lunch break';
       r.plan = [{ go: () => tilesAround({ x: 36.5, y: 7.5 }, 1) }, { loop: () => {
@@ -1132,6 +1135,7 @@ function load() {
     applyCatalog();
     G.trash = G.trash || [];
     G.crew.forEach(c => ensureMorale(ensureTrain(c, 40)));
+    ensureLabor();
     if (!G.list && G.phase === 'day') G.list = buildChecklist();
     RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {};
     G.vendorsToday.forEach(v => {
