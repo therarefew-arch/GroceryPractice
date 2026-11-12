@@ -1,6 +1,6 @@
 # Grocery Practice
 
-**Version 0.0.1**
+**Version 0.0.2**
 
 A 2D grocery store manager simulator for practicing the real job: receiving the night truck, building floats, working freight, keeping the shelves full, running the crew, and ordering for tomorrow. All without blowing the labor budget.
 
@@ -11,7 +11,9 @@ It's plain HTML/JavaScript, so there's no build step.
 - **Locally:** serve the folder with any static server, e.g. `npx http-server -p 8123`, then open http://localhost:8123
 - **Online:** enable GitHub Pages for this repo (Settings → Pages → deploy from branch) and it plays in any browser.
 
-**Controls:** `WASD`/arrows move · `Shift` run · `E`/`Space` interact · `P` pause · `1` `2` `3` speed · `Esc` leave the computer
+**Controls:** `WASD`/arrows move · `Shift` run · `E`/`Space` interact · mouse wheel, `+`/`-` or `Z` zoom · `M` sound · `P` pause · `1` `2` `3` speed · `Esc` leave the computer
+
+**Extras:** hover over a crew member to see what they are working on · chain sorts and stocks within 6 seconds for a combo XP bonus · a minimap appears while zoomed in · synth sound effects (mute with `M`) · confetti on level-ups and finishing the truck · rush-hour warning at 4 PM
 
 ## The daily loop
 
@@ -42,7 +44,8 @@ Everything store-specific lives in [`js/data.js`](js/data.js): departments/aisle
 | `js/data.js` | Store data you can edit |
 | `js/map.js` | Floor plan and pathfinding |
 | `js/game.js` | Simulation: day/night cycle, crew AI, customers, vendors, player, saving |
-| `js/render.js` | Canvas drawing |
+| `js/render.js` | Canvas drawing and the zoom camera |
+| `js/fx.js` | Sound effects, combos, confetti, minimap, worker hover info |
 | `js/ui.js` | HUD, office computer, modals |
 
 Progress auto-saves in the browser (localStorage).

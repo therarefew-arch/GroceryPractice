@@ -8,7 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1320, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.1'; // bump the last number on every update
+const VERSION = '0.0.2'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -127,6 +127,7 @@ function toast(msg, kind) {
   el.className = 'toast ' + (kind || '');
   el.textContent = msg;
   document.getElementById('toasts').appendChild(el);
+  if (typeof SFX !== 'undefined') (SFX[kind] || SFX.info)();
   setTimeout(() => el.remove(), 5000);
 }
 function floater(x, y, text, color) { RT.floaters.push({ x, y, text, color: color || '#fff', t: 0 }); }
@@ -135,6 +136,7 @@ function addXP(n, at) {
   G.xp += n;
   if (G.today) G.today.xp += n;
   if (at) floater(at.x, at.y - 0.7, `+${n} XP`, '#ffd34d');
+  if (level() > before) { confetti(G.player.x, G.player.y, 70); }
   if (level() > before) toast(`⭐ LEVEL UP! Level ${level()} — ${title()}. +1 crew slot unlocked.`, 'gold');
 }
 
@@ -383,6 +385,7 @@ function update(dt) {
       G.today.truckDoneAt = G.time;
       toast(`🚚 Truck worked! Finished at ${fmtTime(G.time)}.`, 'good');
       addXP(20, G.player);
+      confetti(G.player.x, G.player.y, 50);
     }
   } else if (G.time >= NIGHT_END) { endNight(); return; }
   updateCrew(dt, gm);
@@ -391,6 +394,7 @@ function update(dt) {
 function onHour(h) {
   if (h >= 9 && h <= 21) spoilCheck();
   if (h === 13 && G.sat < 55) mail('Customer Service Desk', 'Complaints are piling up', 'We\'re getting a lot of complaints about empty shelves and wrong prices today. Can someone check the floor?');
+  if (h === 16) toast('🛒 Rush hour is coming (4–7 PM). Top off the fast movers now!', 'warn');
   if (h % 2 === 0) save();
 }
 
@@ -923,6 +927,7 @@ function playerPick(pal) {
   G.player.carry.push(c);
   if (!pal.cases.length) removeEmptyPallets();
   floater(G.player.x, G.player.y - 0.9, caseLabel(c), DEPT[c.d].color);
+  SFX.pick();
 }
 function playerSort(f) {
   const p = G.player, m = p.carry.filter(c => c.d === f.dept);
@@ -930,6 +935,7 @@ function playerSort(f) {
   f.cases.push(...m);
   G.today.youSorted += m.length;
   addXP(m.length, f);
+  SFX.stock(m.length); comboHit(m.length, G.player);
 }
 function wrongFloat(fl) {
   G.today.missorts++;
@@ -944,6 +950,7 @@ function playerStockCarry(dept) {
   m.forEach(c => stockUnits(dept, caseUnits(c)));
   G.today.youStocked += m.length;
   addXP(m.length, p);
+  SFX.stock(m.length); comboHit(m.length, p);
 }
 function playerCarryToBack() { const p = G.player; p.carry.forEach(c => { G.stock[c.d].back += caseUnits(c); }); p.carry = []; }
 function playerPullBack(dept) {
@@ -1042,6 +1049,7 @@ function boot() {
   buildMap();
   canvas.width = MW * TILE; canvas.height = MH * TILE;
   BG = drawBG();
+  const mb = document.getElementById('btn-mute'); if (mb) mb.textContent = FX.muted ? '🔇' : '🔊';
   const ver = document.getElementById('ver'); if (ver) ver.textContent = 'v' + VERSION;
   document.title = 'Grocery Practice v' + VERSION;
   if (document.fonts) document.fonts.load(PX(8)).then(() => { BG = drawBG(); }).catch(() => {});

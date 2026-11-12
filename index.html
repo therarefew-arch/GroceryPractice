@@ -32,6 +32,7 @@
         <button data-speed="2" title="Fast (2)">2×</button>
         <button data-speed="4" title="Faster (3)">4×</button>
       </div>
+      <button id="btn-mute" title="Sound on/off (M)" onclick="toggleMute()">🔊</button>
       <button id="btn-endnight" class="primary hidden">End night ▶</button>
     </div>
   </header>
@@ -39,8 +40,8 @@
   <footer id="bar">
     <span id="prompt"></span>
     <span id="holding"></span>
-    <span id="ver" class="keys" title="Game version">v0.0.1</span>
-    <span class="keys">WASD move · Shift run · E interact · P pause · 1/2/3 speed</span>
+    <span id="ver" class="keys" title="Game version">v0.0.2</span>
+    <span class="keys">WASD move · Scroll / +− / Z zoom · Shift run · E interact · M sound · P pause · 1/2/3 speed</span>
   </footer>
 
   <div id="modal" class="hidden"><div class="modal-card" id="modal-card"></div></div>
@@ -55,6 +56,7 @@
   <script src="js/map.js"></script>
   <script src="js/game.js"></script>
   <script src="js/render.js"></script>
+  <script src="js/fx.js"></script>
   <script src="js/ui.js"></script>
   <script>boot();</script>
 </body>

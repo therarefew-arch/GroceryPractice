@@ -28,6 +28,10 @@ const UI = {
       RT.keys[e.code] = true;
       if (e.repeat) return;
       if (e.code === 'KeyP') RT.paused = !RT.paused;
+      if (e.code === 'KeyM') toggleMute();
+      if (e.code === 'Equal' || e.code === 'NumpadAdd') setZoom(CAM.target * 1.25);
+      if (e.code === 'Minus' || e.code === 'NumpadSubtract') setZoom(CAM.target / 1.25);
+      if (e.code === 'KeyZ') setZoom(CAM.target > 1 ? 1 : 2.2);
       if (e.code === 'Digit1') setSpeed(1);
       if (e.code === 'Digit2') setSpeed(2);
       if (e.code === 'Digit3') setSpeed(4);

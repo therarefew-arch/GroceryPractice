@@ -466,7 +466,37 @@ function drawTrailer() {
   label(ctx, G.trailer.length ? `TRAILER · ${plural(G.trailer.length, 'pallet')}`.toUpperCase() : 'TRAILER EMPTY', x + w / 2, y + 10, { font: PX(8), color: '#14223a' });
 }
 
+// ---- Camera: scroll wheel zooms in on the player --------------------------
+const CAM = { zoom: 1, target: 1, min: 1, max: 3.5 };
+try { const z = parseFloat(localStorage.getItem('groceryPractice.zoom')); if (z >= CAM.min && z <= CAM.max) CAM.zoom = CAM.target = z; } catch (e) { /* ignore */ }
+function setZoom(z) {
+  CAM.target = clamp(z, CAM.min, CAM.max);
+  if (CAM.target < 1.03) CAM.target = 1;
+  try { localStorage.setItem('groceryPractice.zoom', String(CAM.target)); } catch (e) { /* ignore */ }
+}
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  setZoom(CAM.target * (e.deltaY < 0 ? 1.15 : 1 / 1.15));
+}, { passive: false });
+
+function applyCamera() {
+  CAM.zoom += (CAM.target - CAM.zoom) * 0.2;
+  if (Math.abs(CAM.target - CAM.zoom) < 0.002) CAM.zoom = CAM.target;
+  const z = CAM.zoom, W = MW * T, H = MH * T, vw = W / z, vh = H / z;
+  const p = G.player;
+  const cx = clamp(p.x * T - vw / 2, 0, W - vw), cy = clamp(p.y * T - vh / 2, 0, H - vh);
+  CAM.x = cx; CAM.y = cy;
+  ctx.setTransform(z, 0, 0, z, -cx * z, -cy * z);
+  ctx.imageSmoothingEnabled = z === 1;
+}
+
+let lastRenderTs = 0;
 function render() {
+  const now = performance.now(), rdt = lastRenderTs ? Math.min(0.05, (now - lastRenderTs) / 1000) : 0.016;
+  lastRenderTs = now;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = PAL.void; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  applyCamera();
   ctx.drawImage(BG, 0, 0);
   drawShelves(); drawRacks(); drawEndcaps(); drawTags();
   if (G.phase === 'night') drawTrailer();
@@ -481,12 +511,18 @@ function render() {
     label(ctx, f.text, f.x * T, f.y * T, { font: PX(10), color: f.color, outline: 'rgba(0,0,0,0.9)' });
     ctx.globalAlpha = 1;
   });
+  drawParticles(rdt);
   if (G.phase === 'night') {
     ctx.fillStyle = 'rgba(5,10,30,0.6)'; ctx.fillRect(T, 11 * T, (MW - 2) * T, 13 * T);
     label(ctx, 'STORE CLOSED · NIGHT TRUCK', 20 * T, 17 * T, { font: PX(18), color: 'rgba(66,215,255,0.7)', glow: PAL.cyan });
   } else if (G.phase === 'day' && G.time < OPEN) {
     label(ctx, 'DOORS OPEN AT 7:00 AM', 20 * T, 17 * T, { font: PX(16), color: 'rgba(66,215,255,0.35)', glow: PAL.cyan });
   }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.imageSmoothingEnabled = true;
   if (!OVERLAY) OVERLAY = drawOverlay();
   ctx.drawImage(OVERLAY, 0, 0);
+  drawComboMeter();
+  drawMinimap();
+  drawCrewTooltip();
 }
