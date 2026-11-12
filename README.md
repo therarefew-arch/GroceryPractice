@@ -1,6 +1,6 @@
 # Grocery Practice
 
-**Version 0.0.11**
+**Version 0.0.12**
 
 A 2D grocery store manager simulator for practicing the real job: receiving the night truck, building floats, working freight, keeping the shelves full, running the crew, and ordering for tomorrow. All without blowing the labor budget.
 
@@ -61,6 +61,8 @@ It's plain HTML/JavaScript, so there's no build step.
 
 **Backroom layout:** the store can't change shape, but you can rearrange the backroom (Office computer → 🧱 Backroom Layout). Move each department's float spot, reload staging (an 8×1 row or a 4×2 block) and the baler. Nothing can go on receiving, the dock, doorways or the backstock rack aisle, and there must be a path around everything. The tab shows walk distances (receiving → float → shelf, baler, reload staging, dock) against the original layout: shorter trips mean a faster truck.
 
+**On your phone:** open https://therarefew-arch.github.io/GroceryPractice/ and turn the phone sideways. On touch screens you get a joystick (left), a big **E** button, **RUN** (tap to toggle), zoom, pause and full screen. You can also tap the yellow action text at the bottom, and tap a crew member to see their card. To install it like an app: iPhone, Safari → Share → Add to Home Screen; Android, Chrome → ⋮ → Add to Home screen / Install app. It works offline after the first load. Your phone keeps its own save. Add `?touch=1` to the URL to force the touch controls on (or `?touch=0` to turn them off).
+
 **Weekly DM review:** after Friday's close (weeks run Saturday to Friday) your District Manager grades the week. He is harsh but fair: for every problem he tells you what he saw, why it matters and what to do next week. Reviews also land in your email and on the Records tab.
 
 **Records board:** Office computer → 🏆 Records tracks your personal bests (best score, top sales, fastest truck, lowest labor %, best in-stock, lowest OOS count, longest B-or-better streak, most coaching in a day).
@@ -86,6 +88,7 @@ Everything store-specific lives in [`js/data.js`](js/data.js): departments/aisle
 | `js/labor.js` | Weekly schedules, overtime, Monday forecast, labor demand, Labor Demand Exception report |
 | `js/backroom.js` | Empty pallets, baler & bales, reload staging, truck stop order, sweeping, crooked floats, bird overflow |
 | `js/layout.js` | Backroom layout: movable float spots, reload staging and baler, validation, walk distances |
+| `js/touch.js` | Phone/tablet joystick and buttons, home-screen app (with `sw.js`, `manifest.webmanifest`, `icons/`) |
 | `js/review.js` | Weekly DM review, records board, gamepad |
 | `js/ui.js` | HUD, office computer, modals |
 

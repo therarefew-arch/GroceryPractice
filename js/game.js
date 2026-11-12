@@ -8,7 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1380, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.11'; // bump the last number on every update
+const VERSION = '0.0.12'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -941,13 +941,13 @@ function blockedAt(x, y, rad) {
 }
 function updatePlayer(dt) {
   const p = G.player, k = RT.keys;
-  let dx = ((k.ArrowRight || k.KeyD || k.PadRight) ? 1 : 0) - ((k.ArrowLeft || k.KeyA || k.PadLeft) ? 1 : 0);
-  let dy = ((k.ArrowDown || k.KeyS || k.PadDown) ? 1 : 0) - ((k.ArrowUp || k.KeyW || k.PadUp) ? 1 : 0);
+  let dx = ((k.ArrowRight || k.KeyD || k.PadRight || k.TouchRight) ? 1 : 0) - ((k.ArrowLeft || k.KeyA || k.PadLeft || k.TouchLeft) ? 1 : 0);
+  let dy = ((k.ArrowDown || k.KeyS || k.PadDown || k.TouchDown) ? 1 : 0) - ((k.ArrowUp || k.KeyW || k.PadUp || k.TouchUp) ? 1 : 0);
   if (dx || dy) {
     p.work = null;
     const l = Math.hypot(dx, dy); dx /= l; dy /= l;
     p.fx = dx; p.fy = dy;
-    let sp = (k.ShiftLeft || k.ShiftRight || k.PadRun) ? 6.5 : 4.2;
+    let sp = (k.ShiftLeft || k.ShiftRight || k.PadRun || k.TouchRun) ? 6.5 : 4.2;
     if (p.floatId || p.pallet) sp *= 0.75;
     if (!blockedAt(p.x + dx * sp * dt, p.y, 0.3)) p.x += dx * sp * dt;
     if (!blockedAt(p.x, p.y + dy * sp * dt, 0.3)) p.y += dy * sp * dt;

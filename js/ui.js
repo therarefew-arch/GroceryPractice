@@ -42,6 +42,8 @@ const UI = {
     });
     window.addEventListener('keyup', e => { RT.keys[e.code] = false; });
     window.addEventListener('blur', () => { RT.keys = {}; });
+    window.addEventListener('pagehide', () => { if (G && (G.phase === 'day' || G.phase === 'night')) save(); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden && G && (G.phase === 'day' || G.phase === 'night')) save(); });
     fit();
   },
 
@@ -50,7 +52,7 @@ const UI = {
     if (p.work) { el.textContent = p.work.label + '…'; el.className = ''; }
     else {
       const it = isPaused() ? null : getInteraction();
-      if (it) { el.textContent = (it.fn ? '[E] ' : '') + it.label; el.className = it.bad ? 'bad' : ''; }
+      if (it) { el.textContent = (it.fn ? (TOUCH ? '👆 ' : '[E] ') : '') + it.label; el.className = it.bad ? 'bad' : ''; }
       else { el.textContent = this.hint(); el.className = 'hint'; }
     }
     let hold = '';
@@ -58,12 +60,13 @@ const UI = {
     else if (p.floatId) { const f = floatById(p.floatId); if (f) hold = `Pushing ${DEPT[f.dept].aisle} ${DEPT[f.dept].name} float · ${plural(f.cases.length, 'case')}`; }
     else if (p.pallet) hold = `Pallet jack: ${plural(p.pallet.cases.length, 'case')}${p.pallet.cold ? ' (cold)' : ''}`;
     $('holding').textContent = hold;
+    touchFrame();
     const now = performance.now();
     if (now - this.lastHud > 200) { this.lastHud = now; this.updateHUD(); }
   },
 
   hint() {
-    if (RT.paused) return 'Paused — press P to resume';
+    if (RT.paused) return TOUCH ? 'Paused — tap ▶ to resume' : 'Paused — press P to resume';
     if (G.phase === 'night') return G.trailer.length ? 'Night: pull pallets off the trailer at the dock doors (top-left), or press "End night".' : 'Trailer empty! Break down pallets or press "End night" to start tomorrow.';
     if (G.phase === 'day' && G.time < OPEN) return 'Doors open at 7:00 AM — get freight on the shelves.';
     if (G.vendorsToday.some(v => v.state === 'waiting')) return 'A DSD vendor is waiting at the back door (green DSD door).';

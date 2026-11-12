@@ -2,7 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0b090c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Grocery">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="icons/favicon-32.png">
   <title>Grocery Practice</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -41,7 +49,7 @@
   <footer id="bar">
     <span id="prompt"></span>
     <span id="holding"></span>
-    <span id="ver" class="keys" title="Game version">v0.0.11</span>
+    <span id="ver" class="keys" title="Game version">v0.0.12</span>
     <span class="keys">WASD move · Scroll / +− / Z zoom · Shift run · E interact · M sound · P pause · 1/2/3 speed</span>
   </footer>
 
@@ -67,6 +75,7 @@
   <script src="js/fx.js"></script>
   <script src="js/review.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/touch.js"></script>
   <script>boot();</script>
 </body>
 </html>
