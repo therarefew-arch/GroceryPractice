@@ -157,20 +157,21 @@ const UI = {
   tab_crew() {
     const hours = sh => (SHIFTS[sh].end - SHIFTS[sh].start) / 60;
     let h = `<h2>Crew & Schedule</h2><p class="mute">Change roles and shifts any time — it takes effect right away. Crew slots: ${G.crew.length}/${maxCrew()} (level up for more).</p>`;
-    h += `<table><tr><th>Name</th><th>Role</th><th>Shift</th><th>Skill</th><th class="n">Wage</th><th>Right now</th><th></th></tr>`;
+    h += `<table><tr><th>Name</th><th>Role</th><th>Shift</th><th>Skill</th><th>Rank</th><th>Training</th><th class="n">Coached</th><th class="n">Days</th><th class="n">Wage</th><th>Right now</th><th></th></tr>`;
     for (const c of G.crew) {
       const r = RT.crew[c.id];
       const status = c.calledOut ? '<span class="bad">Called out</span>' : onShift(c) ? (r && r.inBuilding ? `<span class="good">${r.intent || 'On the clock'}</span>` : 'Clocking in') : '<span class="mute">Off the clock</span>';
       h += `<tr><td><span class="dot" style="background:${ROLES[c.role].color}"></span>${esc(c.name)}</td>
         <td><select onchange="UI.setRole(${c.id},this.value)">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${k === c.role ? 'selected' : ''}>${v.name}</option>`).join('')}</select></td>
         <td><select onchange="UI.setShift(${c.id},this.value)">${Object.entries(SHIFTS).map(([k, v]) => `<option value="${k}" ${k === c.shift ? 'selected' : ''}>${v.name}</option>`).join('')}</select></td>
-        <td>${stars(c.skill)}</td><td class="n">$${c.wage.toFixed(2)}/hr</td><td>${status}</td>
+        <td>${stars(c.skill)}</td><td>${rankHTML(c)}</td><td>${trainMeter(c)}</td><td class="n">${c.coached || 0}</td><td class="n">${c.days || 0}</td><td class="n">$${c.wage.toFixed(2)}/hr</td><td>${status}${c.needsCoach ? ' <span class="bad">⚠ needs coaching</span>' : ''}</td>
         <td><button class="danger" onclick="UI.fire(${c.id})">Fire</button></td></tr>`;
     }
     h += '</table>';
     const proj = sum(G.crew.filter(c => !c.calledOut && c.shift !== 'night').map(c => hours(c.shift) * c.wage));
     const projN = sum(G.crew.filter(c => c.shift === 'night').map(c => hours(c.shift) * c.wage));
     h += `<p>Scheduled day labor: <b>${money(proj)}</b> ≈ <b>${(proj / Math.max(1, G.today.goal) * 100).toFixed(1)}%</b> of today's sales goal. Night crew: <b>${money(projN)}</b> (charged to the next day). Target ≤ ${LABOR_TARGET}%.</p>`;
+    h += `<h3>Training & coaching</h3><p class="mute">New hires make mistakes: wrong floats, cardboard left in aisles, wrong tags, short DSD deliveries, phone breaks. A red <b class="bad">!</b> appears over their head. Walk up and press <kbd>E</kbd> to coach them within 2 hours, or the mistake becomes a habit. Rookie → Trained → Pro → <b style="color:#ffd34d">★ Superstar</b> (85% trained, coached 8+ times, 3+ days on the job): 15% faster, no mistakes, and mentors rookies on their shift.</p>`;
     h += `<h3>Roles</h3><table>${Object.values(ROLES).map(r => `<tr><td style="white-space:nowrap"><span class="dot" style="background:${r.color}"></span><b>${r.name}</b></td><td class="mute">${r.desc}</td></tr>`).join('')}</table>`;
     return h;
   },
@@ -189,7 +190,7 @@ const UI = {
     const full = G.crew.length >= maxCrew();
     let h = `<h2>Hiring</h2><p class="mute">New applicants every morning. ${full ? '<span class="warn">All crew slots are full — let someone go or level up.</span>' : `Open slots: ${maxCrew() - G.crew.length}.`} You can change a hire's role and shift later in Crew & Schedule.</p><div class="cand">`;
     h += G.candidates.map(c => `<div class="card"><div class="v" style="font-size:16px">${esc(c.name)}</div><div><span class="dot" style="background:${ROLES[c.role].color}"></span>${ROLES[c.role].name}</div>
-      <div class="s" style="margin:4px 0">${ROLES[c.role].desc}</div><div>${stars(c.skill)} · <b>$${c.wage.toFixed(2)}/hr</b></div><div class="s">Wants: ${SHIFTS[c.shift].name}</div>
+      <div class="s" style="margin:4px 0">${ROLES[c.role].desc}</div><div>${stars(c.skill)} · <b>$${c.wage.toFixed(2)}/hr</b></div><div class="s">Training: ${c.exp != null ? c.exp : 0}% · new hires need coaching</div><div class="s">Wants: ${SHIFTS[c.shift].name}</div>
       <button class="primary" ${full ? 'disabled' : ''} onclick="UI.hire(${c.id})" style="margin-top:8px">Hire</button></div>`).join('') || '<p class="mute">No applicants left today. Check back tomorrow.</p>';
     h += '</div><p class="mute">Skill sets walking and working speed (★1 ≈ 82%, ★5 ≈ 130%). More skill costs more per hour.</p>';
     return h;
@@ -198,7 +199,7 @@ const UI = {
     if (G.crew.length >= maxCrew()) return;
     const k = G.candidates.find(x => x.id === id);
     G.candidates = G.candidates.filter(x => x !== k);
-    G.crew.push({ id: k.id, name: k.name, role: k.role, shift: k.shift, skill: k.skill, wage: k.wage, calledOut: false });
+    G.crew.push(ensureTrain({ id: k.id, name: k.name, role: k.role, shift: k.shift, skill: k.skill, wage: k.wage, calledOut: false }, k.exp != null ? k.exp : hireTrainingBase(k.skill)));
     toast(`Hired ${k.name} as ${ROLES[k.role].name} (${SHIFTS[k.shift].name}).`, 'good');
     this.render();
   },

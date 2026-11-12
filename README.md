@@ -1,6 +1,6 @@
 # Grocery Practice
 
-**Version 0.0.2**
+**Version 0.0.3**
 
 A 2D grocery store manager simulator for practicing the real job: receiving the night truck, building floats, working freight, keeping the shelves full, running the crew, and ordering for tomorrow. All without blowing the labor budget.
 
@@ -31,6 +31,8 @@ It's plain HTML/JavaScript, so there's no build step.
 
 **Crew roles:** Truck Breakdown, Freight Pusher, Replenishment, DSD Receiver, Scan/Price Clerk, HBC Clerk, Dairy Clerk, Frozen Clerk, Night Unloader. Each has a shift, a skill level and a wage.
 
+**Training & coaching:** new hires make realistic mistakes (wrong float, cardboard left in an aisle, tag on the wrong item, signing for a short DSD delivery, phone breaks). A red **!** appears over them. Walk up and press `E` to coach within 2 hours, or the mistake becomes a habit. Crew rank up Rookie → Trained → Pro → ★ Superstar (85% trained, coached 8+ times, 3+ days on the job). Superstars work 15% faster, make no mistakes and mentor rookies on their shift. Hover any worker to see their training bars.
+
 **Realism hooks:** cold pallets spoil if they sit in the back · forecasts use sales *plus* lost sales · endcaps lift demand and feed the forecast · vendors give up after 45 minutes · open price tags cause overcharges and complaints.
 
 ## Make it your store
@@ -45,6 +47,7 @@ Everything store-specific lives in [`js/data.js`](js/data.js): departments/aisle
 | `js/map.js` | Floor plan and pathfinding |
 | `js/game.js` | Simulation: day/night cycle, crew AI, customers, vendors, player, saving |
 | `js/render.js` | Canvas drawing and the zoom camera |
+| `js/training.js` | Crew mistakes, coaching, ranks, mentoring, cardboard trash |
 | `js/fx.js` | Sound effects, combos, confetti, minimap, worker hover info |
 | `js/ui.js` | HUD, office computer, modals |
 

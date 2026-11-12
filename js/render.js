@@ -411,8 +411,11 @@ function drawProgress(x, y, p) {
 function drawCrew(c, r) {
   if (r.pallet) drawPallet(r.pallet, r.x + r.fx * 0.6, r.y + r.fy * 0.6);
   const role = ROLES[c.role];
-  const top = pixelPerson(r, role.color, { seed: hash(c.name), vest: 'rgba(0,0,0,0.25)' });
-  nameplate(ctx, c.name.split(' ')[0].toUpperCase(), r.x * T, top - 9, { font: PX(8), h: 12, edge: role.color });
+  const star = isStar(c);
+  const top = pixelPerson(r, role.color, { seed: hash(c.name), vest: 'rgba(0,0,0,0.25)', ring: star ? '#ffd34d' : null });
+  const first = c.name.split(' ')[0].toUpperCase();
+  nameplate(ctx, star ? '★ ' + first : first, r.x * T, top - 9, star ? { font: PX(8), h: 12, edge: '#ffd34d', color: '#ffe9a0', bg: '#2a2208' } : { font: PX(8), h: 12, edge: role.color });
+  if (c.needsCoach) drawCoachBubble(r, top);
   if (r.carry.length) drawCarry(r.x, r.y - 0.1, r.carry.slice(0, 4));
   if (r.progress > 0) drawProgress(r.x, r.y, r.progress);
 }
@@ -498,7 +501,7 @@ function render() {
   ctx.fillStyle = PAL.void; ctx.fillRect(0, 0, canvas.width, canvas.height);
   applyCamera();
   ctx.drawImage(BG, 0, 0);
-  drawShelves(); drawRacks(); drawEndcaps(); drawTags();
+  drawShelves(); drawRacks(); drawEndcaps(); drawTags(); drawTrash();
   if (G.phase === 'night') drawTrailer();
   G.pallets.forEach(p => drawPallet(p));
   G.floats.forEach(drawFloat);

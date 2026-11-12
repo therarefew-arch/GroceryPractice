@@ -75,6 +75,7 @@ const BADGES = {
   coldChain: { name: 'Cold Chain', desc: 'Zero cold-freight spoilage' },
   adStar: { name: 'Ad Star', desc: 'Met the district\'s ad endcap request' },
   straightA: { name: 'Straight A', desc: 'Earned an A for the day' },
+  coach: { name: 'Coach', desc: 'Coached your crew 4+ times in one day' },
 };
 
 const FIRST_NAMES = ['Alex', 'Jordan', 'Sam', 'Taylor', 'Casey', 'Riley', 'Morgan', 'Jamie', 'Quinn', 'Avery', 'Devon', 'Reese', 'Skyler',

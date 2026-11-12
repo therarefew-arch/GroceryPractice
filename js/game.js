@@ -8,7 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1320, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.2'; // bump the last number on every update
+const VERSION = '0.0.3'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -146,6 +146,7 @@ function makeCandidate() {
     id: nid(), name: pick(FIRST_NAMES) + ' ' + pick(LAST_INITIALS) + '.', role, skill,
     shift: role === 'unloader' ? 'night' : pick(['open', 'open', 'mid', 'close']),
     wage: +(12.5 + skill * 1.25 + rand(0, 1)).toFixed(2),
+    exp: hireTrainingBase(skill),
   };
 }
 
@@ -183,6 +184,8 @@ function newGame() {
   G.endcaps[MAPD.endcaps[5].id] = 'A3';
   G.crew.push({ id: nid(), name: 'Maria L.', role: 'breakdown', shift: 'open', skill: 3, wage: 16.25, calledOut: false });
   G.crew.push({ id: nid(), name: 'Devon P.', role: 'freight', shift: 'open', skill: 3, wage: 16.25, calledOut: false });
+  G.crew.forEach(c => ensureTrain(c, 40));
+  G.trash = [];
   buildTruck(suggestedOrder()).forEach(p => placePallet(p));
   RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {};
   mail('Store Training', 'Welcome to your store!', [
@@ -258,6 +261,7 @@ function endDay() {
   G.vendorsToday.forEach(v => { if (v.state === 'waiting') { v.state = 'left'; t.vendorsMissed++; } });
   RT.vendorNpcs = {}; RT.customers = [];
   G.crew.forEach(despawnCrew);
+  tenureDay();
   const res = computeResults();
   DEPTS.forEach(d => {
     G.history[d.id].push(t.demand[d.id] || 0);
@@ -302,6 +306,7 @@ function computeResults() {
   if (t.spoiled === 0) badges.push('coldChain');
   if (G.ad && G.ad.depts.every(d => endcapCount(d) >= 2)) badges.push('adStar');
   if (grade === 'A') badges.push('straightA');
+  if ((t.coached || 0) >= 4) badges.push('coach');
   const tips = [];
   if (t.misses) {
     const worst = Object.entries(t.lost).sort((a, b) => b[1] - a[1])[0];
@@ -314,6 +319,8 @@ function computeResults() {
   if (G.tags.length) tips.push(`${G.tags.length} price tags / scan errors were left open. Unhung tags cause overcharges and complaints.`);
   if (t.vendorsMissed) tips.push(`${t.vendorsMissed} DSD vendor(s) left without being checked in. Put someone on DSD, or watch the back door.`);
   if (t.missorts) tips.push(`You tried ${t.missorts} case(s) on the wrong float. Know your aisles: ${DEPTS.map(d => `${d.aisle} ${d.name}`).join(' · ')}.`);
+  if (t.crewMistakes) tips.push(`Your crew made ${t.crewMistakes} mistake(s) and you coached ${t.coached || 0}. Coach right away: that's how rookies become superstars.`);
+  if ((G.trash || []).length) tips.push(`${G.trash.length} piece(s) of cardboard are still on the floor. Messy aisles lower customer satisfaction every hour.`);
   if (!G.orderSubmitted) tips.push('No order was submitted — the system order will be used. Review Forecast & Order before close to practice ordering.');
   if (!tips.length) tips.push('Clean day. Try for a faster truck or tighter labor tomorrow.');
   const gradeXP = { A: 150, B: 100, C: 60, D: 30, F: 10 }[grade];
@@ -393,6 +400,7 @@ function update(dt) {
 
 function onHour(h) {
   if (h >= 9 && h <= 21) spoilCheck();
+  mentorHour(); trashHour();
   if (h === 13 && G.sat < 55) mail('Customer Service Desk', 'Complaints are piling up', 'We\'re getting a lot of complaints about empty shelves and wrong prices today. Can someone check the floor?');
   if (h === 16) toast('🛒 Rush hour is coming (4–7 PM). Top off the fast movers now!', 'warn');
   if (h % 2 === 0) save();
@@ -557,7 +565,7 @@ function rt(c) {
     carry: [], floatId: null, pallet: null, cleanups: [], progress: 0, label: '', intent: '',
   });
 }
-const sf = c => 0.7 + 0.12 * c.skill;
+const sf = c => (0.7 + 0.12 * c.skill) * (isStar(c) ? 1.15 : 1);
 function onShift(c) {
   if (c.calledOut) return false;
   const s = SHIFTS[c.shift];
@@ -581,6 +589,7 @@ function finishPlan(c, r) {
 }
 
 function runPlan(c, r, dt) {
+  if (r.hold > 0) { r.hold -= dt; r.label = 'Being coached'; r.progress = 0; return; }
   const s = r.plan[0];
   if (!s) return finishPlan(c, r);
   if (s.go) {
@@ -660,6 +669,10 @@ function planBreakdown(c, r, only) {
     { wait: 0.4, label: 'Building float' },
     { do: () => {
       if ((f.claimedBy && f.claimedBy !== c.id) || dist(r, f) > 2.5) return false;
+      if (r.carry.length && rollMistake(c, 'sort', 0.22)) {
+        const others = G.floats.filter(o => o !== f && !o.carriedBy);
+        if (others.length) { const cs = r.carry.pop(); cs.mis = true; pick(others).cases.push(cs); }
+      }
       f.cases.push(...r.carry); r.carry = [];
       f.incoming = Math.max(0, f.incoming - reserved); reserved = 0;
       return true;
@@ -686,9 +699,13 @@ function planFreight(c, r, only, readyMin) {
       r.label = 'Working freight';
       if (!f.cases.length || !canStock(dept)) { r.progress = 0; return true; }
       t += dt * sf(c); r.progress = t;
-      if (t >= 1) { t = 0; const cs = f.cases.pop(); stockUnits(cs.d, caseUnits(cs)); }
+      if (t >= 1) {
+        t = 0; const cs = f.cases.pop();
+        if (cs.mis) { G.stock[cs.d].back += caseUnits(cs); floater(r.x, r.y - 1, 'Mis-sort! To backstock', '#ff9f6b'); } else stockUnits(cs.d, caseUnits(cs));
+      }
       return false;
     } },
+    { do: () => { if (rollMistake(c, 'stock', 0.12)) dropTrash(r); return true; } },
     { do: () => (f.cases.length ? [{ go: () => [rackAccess(dept)] }, { wait: 1.2, label: 'Backstocking overflow' }, { do: () => { floatToBack(f); return true; } }] : true) },
     { go: () => tilesAround({ x: f.homeX, y: f.homeY }, 1).filter(tl => !(tl.x === Math.floor(f.homeX) && tl.y === Math.floor(f.homeY))) },
     { do: () => { f.carriedBy = null; r.floatId = null; f.x = f.homeX; f.y = f.homeY; f.claimedBy = null; return true; } },
@@ -722,6 +739,7 @@ function planReplen(c, r, only, threshold) {
       if (t >= 0.8) { t = 0; const cs = r.carry.pop(); stockUnits(dept, caseUnits(cs)); }
       return false;
     } },
+    { do: () => { if (rollMistake(c, 'stock', 0.08)) dropTrash(r); return true; } },
   ];
 }
 
@@ -734,7 +752,11 @@ function planDSD(c, r) {
   return [
     goEnt(() => (v.state === 'waiting' ? RT.vendorNpcs[v.name] : null)),
     { wait: 2.5, label: 'Checking in vendor' },
-    { do: () => { if (v.state !== 'waiting') return false; checkInVendor(v, false); return true; } },
+    { do: () => {
+      if (v.state !== 'waiting') return false;
+      if (v.cases > 1 && rollMistake(c, 'dsd', 0.3)) { const short = Math.min(2, v.cases - 1); v.cases -= short; G.today.shrink += short * DEPT[v.dept].upc * DEPT[v.dept].price * 0.6; }
+      checkInVendor(v, false); return true;
+    } },
   ];
 }
 
@@ -749,7 +771,11 @@ function planPrice(c, r) {
   return [
     { go: () => tilesAround(tc(tag), 1) },
     { wait: 2.2, label: tag.kind === 'error' ? 'Fixing scan error' : 'Hanging tag' },
-    { do: () => { if (!G.tags.includes(tag)) return false; fixTag(tag, false); return true; } },
+    { do: () => {
+      if (!G.tags.includes(tag)) return false;
+      if (tag.kind !== 'error' && rollMistake(c, 'price', 0.25)) { tag.kind = 'error'; return true; }
+      fixTag(tag, false); return true;
+    } },
   ];
 }
 
@@ -806,6 +832,7 @@ function brain(c, r) {
 function updateCrew(dt, gm) {
   for (const c of G.crew) {
     const r = rt(c), on = onShift(c);
+    ensureTrain(c); trainingTick(c);
     if (on) { if (G.phase === 'night') G.nightLabor += c.wage * gm / 60; else G.today.labor += c.wage * gm / 60; }
     if (!r.inBuilding) {
       if (r.plan) finishPlan(c, r);
@@ -814,6 +841,7 @@ function updateCrew(dt, gm) {
     }
     if (!r.plan) {
       if (!on) { r.intent = 'Clocking out'; r.plan = [{ go: () => [MAPD.staffDoor] }, { do: () => { r.inBuilding = false; return true; } }]; }
+      else if (G.phase === 'day' && rollMistake(c, 'focus', 0.025)) { r.plan = [{ wait: 6, label: 'On their phone' }]; r.intent = 'On their phone 📱'; }
       else r.plan = brain(c, r) || planIdle(c, r);
     }
     runPlan(c, r, dt);
@@ -894,6 +922,10 @@ function getInteraction() {
     if (Math.hypot(p.x - f.homeX, p.y - f.homeY) < 1.6) return { label: 'Park float at its home spot', fn: () => releaseFloat(true) };
     return { label: 'Let go of the float', fn: () => releaseFloat(false) };
   }
+  const coachee = G.crew.find(c => c.needsCoach && RT.crew[c.id] && RT.crew[c.id].inBuilding && dist(RT.crew[c.id], p) < 1.5);
+  if (coachee && !p.work) return { label: `Coach ${coachee.name}: ${TRAIN_AREAS[coachee.needsCoach.area].mistake}`, fn: () => { const rr = RT.crew[coachee.id]; if (rr) rr.hold = 2.5; startWork(2.5, 'Coaching', () => coachCrew(coachee)); } };
+  const trash = (G.trash || []).find(t => dist(t, p) < 1.1);
+  if (trash) return { label: 'Pick up the cardboard', fn: () => pickUpTrash(trash) };
   const pal = nearest(G.pallets, p, 1.15);
   const fl = nearest(G.floats, p, 1.2, f => !f.carriedBy);
   if (p.carry.length) {
@@ -1017,6 +1049,8 @@ function load() {
     const s = JSON.parse(raw);
     if (s.version !== 1) return false;
     G = s;
+    G.trash = G.trash || [];
+    G.crew.forEach(c => ensureTrain(c, 40));
     RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {};
     G.vendorsToday.forEach(v => {
       if (v.state === 'waiting') RT.vendorNpcs[v.name] = { x: MAPD.vendorSpot.x + 0.5, y: MAPD.vendorSpot.y + 0.5, fx: 0, fy: 1, path: null, mode: 'wait', v };

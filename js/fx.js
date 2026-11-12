@@ -168,11 +168,20 @@ function drawCrewTooltip() {
   }
   if (r.pallet) lines.push({ t: `Pallet jack: ${r.pallet.cases.length} cases`, f: TIP_S, col: '#ffe6b8' });
   if (r.floatId) { const f = G.floats.find(f => f.id === r.floatId); if (f) lines.push({ t: `Pushing ${DEPT[f.dept].name} float · ${f.cases.length} cs`, f: TIP_S, col: '#ffe6b8' }); }
+  ensureTrain(c);
+  const rk = crewRank(c);
+  lines.push({ t: `${rk.icon} ${rk.name} · ${Math.round(trainAvg(c))}% trained · coached ${c.coached}x · ${c.days} days`, f: TIP_S, col: rk.color });
+  for (const k in TRAIN_AREAS) {
+    const v = Math.round(c.train[k]);
+    lines.push({ t: TRAIN_AREAS[k].name, bar: v, f: TIP_S, col: v >= 85 ? '#ffd34d' : v >= 50 ? '#57f287' : '#ff9f6b' });
+  }
+  if (c.needsCoach) lines.push({ t: `⚠ Needs coaching: ${TRAIN_AREAS[c.needsCoach.area].mistake}`, f: TIP, col: '#ff5a4e' });
   const sh = SHIFTS[c.shift];
   lines.push({ t: `${sh ? sh.name : c.shift} · Skill ${'★'.repeat(c.skill)}${'☆'.repeat(5 - c.skill)} · $${(+c.wage || 0).toFixed(2)}/hr`, f: TIP_S, col: '#b08a52' });
 
   let w = 0;
-  lines.forEach(l => { ctx.font = l.f; w = Math.max(w, ctx.measureText(l.t).width); });
+  const BAR_X = 130, BAR_W = 90;
+  lines.forEach(l => { ctx.font = l.f; w = Math.max(w, l.bar != null ? BAR_X + BAR_W + 40 : ctx.measureText(l.t).width); });
   w += 24; const lh = 20, hgt = lines.length * lh + 14;
   let x = sx + 22, y = sy - hgt / 2;
   if (x + w > canvas.width - 8) x = sx - 22 - w;
@@ -180,5 +189,13 @@ function drawCrewTooltip() {
   ctx.fillStyle = 'rgba(12,9,6,0.94)'; ctx.fillRect(x, y, w, hgt);
   ctx.fillStyle = role.color; ctx.fillRect(x, y, 3, hgt);
   ctx.strokeStyle = '#c98a2a'; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, hgt - 1);
-  lines.forEach((l, i) => label(ctx, l.t, x + 12, y + 17 + i * lh, { font: l.f, align: 'left', color: l.col }));
+  lines.forEach((l, i) => {
+    const ly = y + 17 + i * lh;
+    if (l.bar == null) { label(ctx, l.t, x + 12, ly, { font: l.f, align: 'left', color: l.col }); return; }
+    label(ctx, l.t, x + 12, ly, { font: l.f, align: 'left', color: '#ffe6b8' });
+    ctx.fillStyle = '#000'; ctx.fillRect(x + BAR_X, ly - 4, BAR_W, 8);
+    ctx.fillStyle = l.col; ctx.fillRect(x + BAR_X, ly - 4, BAR_W * l.bar / 100, 8);
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; for (let s = 1; s < 10; s++) ctx.fillRect(x + BAR_X + s * BAR_W / 10, ly - 4, 1, 8);
+    label(ctx, l.bar + '%', x + BAR_X + BAR_W + 6, ly, { font: l.f, align: 'left', color: l.col });
+  });
 }
