@@ -1,6 +1,6 @@
 # Grocery Practice
 
-**Version 0.0.4**
+**Version 0.0.5**
 
 A 2D grocery store manager simulator for practicing the real job: receiving the night truck, building floats, working freight, keeping the shelves full, running the crew, and ordering for tomorrow. All without blowing the labor budget.
 
@@ -27,7 +27,11 @@ It's plain HTML/JavaScript, so there's no build step.
 | 10:00 PM | Closing report with a letter grade, XP, a manager bonus, badges and coaching notes. |
 | Night | On truck nights the truck you ordered arrives. Pull pallets off the trailer, or pay overtime to have it done. |
 
-**Weeks and trucks:** store weeks run Saturday to Friday (Day 1 is a Saturday). Weekends are busier, and forecasts use a day-of-week factor. Trucks only come on the nights in `TRUCK_NIGHTS`, and each order must cover the days until the next truck. On truck days the order window closes at `ORDER_CUTOFF` (2:00 PM by default). Miss it and the system order goes. Both settings are in `js/data.js`.
+**Weeks and trucks:** store weeks run Saturday to Friday (Day 1 is a Saturday). Weekends are busier, and forecasts use a day-of-week factor. Trucks come every night with different loads (`TRUCK_SCHEDULE`: Sat LV/Frozen/Dairy, Sun HV, Mon HV/Frozen/Dairy, Tue KeHe/LV/HV, Wed Dairy, Thu KeHe/LV/HV/Frozen/Dairy, Fri KeHe/HV). You can only order departments that are on tonight's trucks, and each order has to cover the days until that department's next truck. The order window closes at `ORDER_CUTOFF` (2:00 PM); miss it and the system order goes.
+
+**Daily checklist (📋):** the real floor-board routine, checked automatically: water and paper runs before open, backstock bird runs by day, closing last night's invoices, Monday ad planning, the Tuesday ad flip and Wednesday verify, Fri–Sun blitzes, the 6 PM dairy hole check, the 10–11 PM close run, a clean backroom, the out-of-stock count, and one stretch goal. Find it on the office computer → Today.
+
+**Shifts:** Open 5a–2p, Truck 6a/7a/8a, Mid 10a–7p, Close 2p–11p, Night 11p–5a. The store closes at 11 PM. Shifts over 6 hours take a 1-hour unpaid lunch break.
 
 **Hard mode by default:** cases show only the item name, so you need to know which aisle it belongs in. Turn on easy mode in Help & Settings to show the aisle.
 

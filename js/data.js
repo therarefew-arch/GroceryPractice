@@ -55,10 +55,13 @@ const ROLES = {
 };
 
 const SHIFTS = {
-  open: { name: 'Open 5:00a–1:30p', start: 300, end: 810 },
-  mid: { name: 'Mid 10:00a–6:30p', start: 600, end: 1110 },
-  close: { name: 'Close 1:30p–10:00p', start: 810, end: 1320 },
-  night: { name: 'Night 10:00p–5:00a', start: 1320, end: 1740 },
+  open: { name: 'Open 5a–2p', start: 300, end: 840 },
+  truck6: { name: 'Truck 6a–3p', start: 360, end: 900 },
+  truck7: { name: 'Truck 7a–4p', start: 420, end: 960 },
+  truck8: { name: 'Truck 8a–5p', start: 480, end: 1020 },
+  mid: { name: 'Mid 10a–7p', start: 600, end: 1140 },
+  close: { name: 'Close 2p–11p', start: 840, end: 1380 },
+  night: { name: 'Night 11p–5a', start: 1380, end: 1740 },
 };
 
 // ---- Calendar: store weeks run Saturday through Friday. Day 1 is a Saturday. ----
@@ -66,13 +69,29 @@ const WEEKDAYS = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 const WEEKDAY_NAMES = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 // How busy each day is compared with an average day (should average 1.0).
 const DOW_FACTOR = { Sat: 1.25, Sun: 1.1, Mon: 0.85, Tue: 0.85, Wed: 0.9, Thu: 0.95, Fri: 1.1 };
-// Warehouse truck schedule: the nights a truck delivers (you work it the next morning).
-const TRUCK_NIGHTS = ['Sat', 'Mon', 'Wed', 'Thu'];
+// Warehouse trucks by night (you work them the next morning). Matches Store 1588's board.
+const TRUCK_TYPES = {
+  HV: { name: 'HV (high volume)', depts: ['A1', 'A2', 'A3', 'A4', 'HBC'] },
+  LV: { name: 'LV (low volume)', depts: ['A1', 'A2', 'A3', 'A4', 'HBC'] },
+  KeHe: { name: 'KeHe (natural & specialty)', depts: ['A2', 'A3', 'HBC'] },
+  Frozen: { name: 'Frozen', depts: ['FRZ'] },
+  Dairy: { name: 'Dairy', depts: ['DAI'] },
+};
+const TRUCK_SCHEDULE = {
+  Sat: ['LV', 'Frozen', 'Dairy'], Sun: ['HV'], Mon: ['HV', 'Frozen', 'Dairy'], Tue: ['KeHe', 'LV', 'HV'],
+  Wed: ['Dairy'], Thu: ['KeHe', 'LV', 'HV', 'Frozen', 'Dairy'], Fri: ['KeHe', 'HV'],
+};
+// Backstock "bird" runs by day: work that aisle's backstock to the shelf.
+const BACKSTOCK_RUNS = { Sat: ['A2', 'HBC'], Sun: [], Mon: ['A3', 'A4'], Tue: ['A2', 'HBC'], Wed: ['A1'], Thu: ['A3', 'A4'], Fri: ['A1', 'A2'] };
+const BLITZ_TIMES = [420, 540, 660, 780, 900, 1020, 1140]; // Fri–Sun blitz: 7a 9a 11a 1p 3p 5p 7p
+const CLOSERS_REQUIRED = 3; // store rule: 3 grocery closers a night
+const OOS_GOAL = 40;        // nightly out-of-stock count goal (empty facings)
+const BREAK_MIN = 60;       // unpaid break for shifts longer than 6 hours
 // On a truck day the order must be in by this time, or the system's suggested order is sent.
 const ORDER_CUTOFF = 14 * 60; // 2:00 PM
 
 // Customer traffic weight by hour (store open 7am–10pm)
-const TRAFFIC = { 7: 0.5, 8: 0.7, 9: 0.8, 10: 0.9, 11: 1.1, 12: 1.3, 13: 1.1, 14: 1.0, 15: 1.0, 16: 1.3, 17: 1.6, 18: 1.5, 19: 1.1, 20: 0.8, 21: 0.5 };
+const TRAFFIC = { 7: 0.5, 8: 0.7, 9: 0.8, 10: 0.9, 11: 1.1, 12: 1.3, 13: 1.1, 14: 1.0, 15: 1.0, 16: 1.3, 17: 1.6, 18: 1.5, 19: 1.1, 20: 0.8, 21: 0.5, 22: 0.3 };
 
 const TITLES = ['Night Stocker', 'Receiving Lead', 'Department Manager', 'Assistant Store Manager', 'Co-Manager', 'Store Manager', 'District Legend'];
 

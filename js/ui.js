@@ -11,7 +11,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 function setSpeed(v) { G.speed = v; RT.paused = false; }
 
 const UI = {
-  open: false, tab: 'dash', mailId: null, drill: null, lastHud: 0,
+  open: false, tab: 'today', mailId: null, drill: null, lastHud: 0,
 
   init() {
     document.querySelectorAll('[data-speed]').forEach(b => {
@@ -72,7 +72,8 @@ const UI = {
 
   updateHUD() {
     const t = G.today;
-    $('h-day').textContent = dayLabel(G.day) + (isTruckNight(G.day) ? ' · 🚚' : '');
+    $('h-day').textContent = dayLabel(G.day);
+    const lp0 = listProgress(); $('h-list').textContent = `${lp0.done}/${lp0.total}`;
     $('h-time').textContent = fmtTime(G.time);
     $('h-phase').textContent = G.phase === 'night' ? 'Night truck' : G.phase === 'summary' ? 'Closed' : G.time < OPEN ? 'Pre-open' : 'Store open';
     $('h-sales').textContent = money(t.sales);
@@ -102,11 +103,31 @@ const UI = {
   render() {
     const main = this['tab_' + this.tab]();
     const unread = G.emails.filter(m => !m.read).length;
-    const tabs = [['dash', '📊 Reports'], ['mail', `📧 Email${unread ? ` (${unread})` : ''}`], ['crew', '👥 Crew & Schedule'], ['hire', '🤝 Hiring'],
+    const tabs = [['today', '📋 Today'], ['dash', '📊 Reports'], ['mail', `📧 Email${unread ? ` (${unread})` : ''}`], ['crew', '👥 Crew & Schedule'], ['hire', '🤝 Hiring'],
       ['display', '🏷️ Display Planner'], ['order', '📈 Forecast & Order'], ['help', '❓ Help & Settings']];
     $('pc-tabs').innerHTML = tabs.map(([k, l]) => `<button class="${this.tab === k ? 'on' : ''}" onclick="UI.setTab('${k}')">${l}</button>`).join('') +
       `<div style="flex:1"></div><div class="mute" style="font-size:12px;padding:6px">The clock is paused while you're logged in.</div>`;
     $('pc-main').innerHTML = main;
+  },
+
+  tab_today() {
+    const L = G.list || [], p = listProgress();
+    let h = `<h2>Today's list · ${WEEKDAY_NAMES[dowIdx(G.day)]}</h2><p class="mute">${p.done} of ${p.total} done. Tasks check themselves off when the work is done. +${TASK_XP} XP each, +${LIST_BONUS_XP} XP for the whole list.</p><table>`;
+    h += L.map(t => `<tr><td style="width:28px">${t.status === 'done' ? '<span class="good">✓</span>' : t.status === 'missed' ? '<span class="bad">✗</span>' : '○'}</td><td><b class="${t.status === 'missed' ? 'bad' : ''}">${esc(t.label)}</b><div class="mute">${esc(t.sub)}</div></td><td class="n mute">${t.mode === 'by' ? 'by' : 'at'} ${fmtTime(t.due)}</td></tr>`).join('');
+    h += '</table><h3>Invoices (last night\'s trucks)</h3><div class="row">';
+    const closed = G.today.invoicesClosed || [];
+    for (const ty of lastNightTrucks()) {
+      const ok = truckWorked(ty), done = closed.includes(ty);
+      h += `<button ${done || !ok ? 'disabled' : ''} onclick="closeInvoice('${ty}');UI.render()">${done ? '✓ ' : ''}${ty}${!ok && !done ? ' (still being worked)' : ''}</button>`;
+    }
+    const dsdOk = dsdAllDone(), dsdDone = closed.includes('DSD');
+    h += `<button ${dsdDone || !dsdOk ? 'disabled' : ''} onclick="closeInvoice('DSD');UI.render()">${dsdDone ? '✓ ' : ''}DSD vendors${!dsdOk && !dsdDone ? ' (vendors still due)' : ''}</button></div>`;
+    const canOOS = G.time >= 1260 && G.today.oosLogged == null;
+    h += `<h3>Out-of-stock count</h3><p>${G.today.oosLogged != null ? `Logged tonight: <b>${G.today.oosLogged}</b> (goal ${OOS_GOAL})` : `Walk-count of empty facings, logged after 9 PM once bills are closed. Right now: <b>${oosCount()}</b>.`}</p>`;
+    if (canOOS) h += '<button class="primary" onclick="logOOS();UI.render()">Log tonight\'s count</button>';
+    const hist = (G.oosLog || []).slice(-14);
+    if (hist.length) h += `<p class="mute">Last ${hist.length} counts: ${spark(hist.map(x => x.n))}</p>`;
+    return h;
   },
 
   tab_dash() {
@@ -223,24 +244,25 @@ const UI = {
     const sug = suggestedOrder();
     const cur = (G.order && G.day === td) ? G.order : sug;
     let h = `<h2>Forecast & Order</h2>`;
-    h += `<p class="mute">Truck nights: <b>${TRUCK_NIGHTS.join(', ')}</b>. Order window closes at <b>${fmtTime(ORDER_CUTOFF)}</b> on truck days.</p>`;
-    if (editable) h += `<p>Order for <b>tonight's truck</b> (${WEEKDAY_NAMES[dowIdx(td)]}). It has to cover <b>${cover} day${cover > 1 ? 's' : ''}</b> of sales (${Array.from({ length: cover }, (_, k) => dowOf(td + 1 + k)).join(', ')}). ${G.orderSubmitted ? '<span class="good">✓ Submitted. You can still change and resubmit until the cutoff.</span>' : `<span class="warn">Not submitted yet. Due by ${fmtTime(ORDER_CUTOFF)}.</span>`}</p>`;
+    h += `<p class="mute">Tonight's trucks: <b>${trucksOn(td).map(t => TRUCK_TYPES[t].name).join(', ')}</b>. Only departments on tonight's trucks can be ordered. The window closes at <b>${fmtTime(ORDER_CUTOFF)}</b>.</p>`;
+    if (editable) h += `<p>Order for <b>tonight's trucks</b> (${WEEKDAY_NAMES[dowIdx(td)]}). Each department's order has to cover the days until its next truck (see Covers). ${G.orderSubmitted ? '<span class="good">✓ Submitted. You can still change and resubmit until the cutoff.</span>' : `<span class="warn">Not submitted yet. Due by ${fmtTime(ORDER_CUTOFF)}.</span>`}</p>`;
     else if (G.phase === 'day' && isTruckNight(G.day)) h += `<p class="warn">The order window closed at ${fmtTime(ORDER_CUTOFF)}. ${G.today.systemOrder ? 'The system order was sent.' : 'Your order is locked in.'}</p>`;
     else h += `<p class="mute">No order due today. Next truck: <b>${WEEKDAY_NAMES[dowIdx(td)]} night</b> (covers ${cover} day${cover > 1 ? 's' : ''}). Preview below.</p>`;
-    h += `<table><tr><th>Department</th><th>Last 7 days (units)</th><th class="n">Avg/day</th><th class="n">Endcap lift</th><th class="n">Forecast (${cover}d)</th><th class="n">On hand</th><th class="n">DSD/day</th><th class="n">Suggested</th><th class="n">Order (cs)</th></tr>`;
+    h += `<table><tr><th>Department</th><th>Last 7 days (units)</th><th class="n">Avg/day</th><th class="n">Endcap lift</th><th class="n">Covers</th><th class="n">Forecast</th><th class="n">On hand</th><th class="n">DSD/day</th><th class="n">Suggested</th><th class="n">Order (cs)</th></tr>`;
     let tot = 0;
     for (const d of DEPTS) {
       const h7 = G.history[d.id].slice(-7);
-      let fc = 0; for (let k = 1; k <= cover; k++) fc += forecastFor(d.id, td + k);
-      const oh = onHandUnits(d.id), val = cur[d.id] || 0;
+      const cv = coverDaysFor(d.id, td);
+      let fc = 0; for (let k = 1; k <= cv; k++) fc += forecastFor(d.id, td + k);
+      const oh = onHandUnits(d.id), val = cv ? (cur[d.id] || 0) : 0;
       tot += val;
       h += `<tr><td><span class="dot" style="background:${d.color}"></span><span class="clickable" onclick="UI.drillTo('${d.id}')">${d.name}</span></td><td>${spark(h7)}</td>
         <td class="n">${Math.round(avgDemand(d.id))}</td><td class="n">${promoLift(d.id) > 1 ? '+' + Math.round((promoLift(d.id) - 1) * 100) + '%' : '—'}</td>
-        <td class="n">${Math.round(fc)} <span class="mute">(${(fc / d.upc).toFixed(1)} cs)</span></td><td class="n">${Math.round(oh)} <span class="mute">(${(oh / d.upc).toFixed(1)} cs)</span></td>
+        <td class="n">${cv ? cv + 'd' : '<span class="mute">not tonight</span>'}</td><td class="n">${Math.round(fc)} <span class="mute">(${(fc / d.upc).toFixed(1)} cs)</span></td><td class="n">${Math.round(oh)} <span class="mute">(${(oh / d.upc).toFixed(1)} cs)</span></td>
         <td class="n">${dsdUnits(d.id) ? Math.round(dsdUnits(d.id) / d.upc) + ' cs' : '—'}</td><td class="n"><b>${sug[d.id]}</b></td>
-        <td class="n"><input type="number" min="0" max="400" value="${val}" ${editable ? '' : 'disabled'} oninput="UI.setOrder('${d.id}',this.value)"></td></tr>`;
+        <td class="n"><input type="number" min="0" max="400" value="${val}" ${editable && cv ? '' : 'disabled'} oninput="UI.setOrder('${d.id}',this.value)"></td></tr>`;
     }
-    h += `<tr><td colspan="8" class="n"><b>Total</b> <span class="mute">(≈ ${Math.max(1, Math.ceil(tot / PALLET_SIZE))} pallets)</span></td><td class="n"><b id="ord-total">${tot}</b> cs</td></tr></table>`;
+    h += `<tr><td colspan="9" class="n"><b>Total</b> <span class="mute">(≈ ${Math.max(1, Math.ceil(tot / PALLET_SIZE))} pallets)</span></td><td class="n"><b id="ord-total">${tot}</b> cs</td></tr></table>`;
     if (editable) h += `<div class="row" style="margin-top:10px;justify-content:flex-end"><button onclick="UI.fillSuggested()">Use suggested</button><button class="primary" onclick="UI.submitOrder()">Submit order</button></div>`;
     h += `<p class="mute">Suggested = forecast for the days this truck covers + 25% of the first day (safety stock) − (on hand − what still sells before the truck) − 80% of expected DSD, rounded up to cases. Daily forecast = 7-day average demand (sales + lost sales) × endcap lift × day-of-week factor (${WEEKDAYS.map(w => w + ' ' + DOW_FACTOR[w]).join(', ')}). Click a department for item detail.</p>`;
     if (this.drill) {
