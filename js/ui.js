@@ -104,12 +104,22 @@ const UI = {
     const main = this['tab_' + this.tab]();
     const unread = G.emails.filter(m => !m.read).length;
     const tabs = [['today', '📋 Today'], ['dash', '📊 Reports'], ['mail', `📧 Email${unread ? ` (${unread})` : ''}`], ['crew', '👥 Crew & Schedule'], ['hire', '🤝 Hiring'],
-      ['display', '🏷️ Display Planner'], ['order', '📈 Forecast & Order'], ['help', '❓ Help & Settings']];
+      ['display', '🏷️ Display Planner'], ['order', '📈 Forecast & Order'], ['records', '🏆 Records'], ['help', '❓ Help & Settings']];
     $('pc-tabs').innerHTML = tabs.map(([k, l]) => `<button class="${this.tab === k ? 'on' : ''}" onclick="UI.setTab('${k}')">${l}</button>`).join('') +
       `<div style="flex:1"></div><div class="mute" style="font-size:12px;padding:6px">The clock is paused while you're logged in.</div>`;
     $('pc-main').innerHTML = main;
   },
 
+  tab_records() {
+    const rec = G.records || {};
+    let h = '<h2>🏆 Records board</h2><p class="mute">Your personal bests. Beat one and you\'ll hear about it.</p><table><tr><th>Record</th><th class="n">Best</th><th>Set on</th></tr>';
+    for (const k in RECORDS) { const r = rec[k]; h += `<tr><td>${RECORDS[k].name}</td><td class="n"><b>${r ? RECORDS[k].fmt(r.v) : '—'}</b></td><td class="mute">${r ? dayLabel(r.day) : 'not set yet'}</td></tr>`; }
+    h += '</table><h3>District Manager reviews</h3>';
+    const rv = (G.reviews || []).slice().reverse();
+    h += rv.length ? '<table><tr><th>Week</th><th>Grade</th><th class="n">Sales</th><th class="n">Labor</th><th class="n">In-stock</th><th></th></tr>' + rv.map((r, i) => `<tr><td>Week ${r.week}</td><td><b>${r.grade}</b> <span class="mute">(${Math.round(r.score)})</span></td><td class="n">${money(r.sales)}</td><td class="n">${r.laborPct.toFixed(1)}%</td><td class="n">${(r.inStock * 100).toFixed(1)}%</td><td><button onclick="UI.showWeekReview(G.reviews[${G.reviews.length - 1 - i}])">Read</button></td></tr>`).join('') + '</table>'
+      : '<p class="mute">Your first review comes after Friday\'s close (weeks run Saturday to Friday).</p>';
+    return h;
+  },
   tab_today() {
     const L = G.list || [], p = listProgress();
     let h = `<h2>Today's list · ${WEEKDAY_NAMES[dowIdx(G.day)]}</h2><p class="mute">${p.done} of ${p.total} done. Tasks check themselves off when the work is done. +${TASK_XP} XP each, +${LIST_BONUS_XP} XP for the whole list.</p><table>`;
@@ -344,16 +354,39 @@ const UI = {
     newGame();
     this.showWelcome();
   },
+  afterSummary() {
+    this.hideModal();
+    if (G.pendingReview) { const r = G.pendingReview; G.pendingReview = null; save(); this.showWeekReview(r, true); }
+    else startNight();
+  },
+  reviewHTML(r) {
+    const color = { A: '#3cc47c', B: '#7bd389', C: '#f0b429', D: '#f08a29', F: '#e5534b' }[r.grade];
+    const notes = r.notes.map(n => `<div class="card" style="margin:8px 0;padding:8px 10px"><b>■ ${esc(n.title)}</b>
+      <p style="margin:4px 0"><span class="mute">What I saw:</span> ${esc(n.saw)}</p>
+      <p style="margin:4px 0"><span class="mute">Why it matters:</span> ${esc(n.why)}</p>
+      <p style="margin:4px 0"><span class="mute">Do this next week:</span> <b>${esc(n.fix)}</b></p></div>`).join('');
+    return `<div class="row" style="justify-content:space-between;flex-wrap:nowrap"><div><h2>Week ${r.week} Review: District Manager</h2>
+      <div class="mute">${r.days} day${r.days > 1 ? 's' : ''} · Sales ${money(r.sales)} of ${money(r.goal)} · Labor ${r.laborPct.toFixed(1)}% · In-stock ${(r.inStock * 100).toFixed(1)}%${r.oosAvg != null ? ' · Avg OOS ' + Math.round(r.oosAvg) : ''}</div></div>
+      <div style="text-align:center"><div class="grade" style="color:${color}">${r.grade}</div><div class="mute">${Math.round(r.score)} avg</div></div></div>
+      <p><i>"${esc(r.open)}"</i></p>${notes}
+      ${r.also && r.also.length ? '<p class="mute">Also on my list: ' + esc(r.also.join(', ')) + '. Fix the ones above first.</p>' : ''}
+      ${r.praise.length ? '<h3>What went right</h3><ul>' + r.praise.map(p => '<li>' + esc(p) + '</li>').join('') + '</ul>' : ''}
+      <p>${esc(r.close)}</p>
+      <p class="mute">Best day: ${r.best.dow} (Day ${r.best.day}, ${r.best.grade}) · Worst day: ${r.worst.dow} (Day ${r.worst.day}, ${r.worst.grade})</p>`;
+  },
+  showWeekReview(r, thenNight) {
+    this.showModal(this.reviewHTML(r) + `<div class="row" style="justify-content:flex-end;margin-top:14px"><button class="primary" onclick="UI.hideModal();${thenNight ? ' startNight();' : ''}">${thenNight ? 'Got it. Clock in for tonight →' : 'Close'}</button></div>`);
+  },
   showSummary(res) {
     const color = { A: '#3cc47c', B: '#7bd389', C: '#f0b429', D: '#f08a29', F: '#e5534b' }[res.grade];
     const parts = res.parts.map(p => `<tr><td>${p.name}</td><td class="mute">${p.detail}</td><td class="n"><b>${Math.round(p.pts)}</b> / ${p.max}</td></tr>`).join('');
-    this.showModal(`<div class="row" style="justify-content:space-between;flex-wrap:nowrap"><div><h2>Day ${res.day} — Closing Report</h2><div class="mute">Doors locked at 10:00 PM</div></div>
+    this.showModal(`<div class="row" style="justify-content:space-between;flex-wrap:nowrap"><div><h2>Day ${res.day} — Closing Report</h2><div class="mute">Doors locked at 11:00 PM</div></div>
       <div style="text-align:center"><div class="grade" style="color:${color}">${res.grade}</div><div class="mute">${Math.round(res.score)} / 100</div></div></div>
       <table>${parts}</table>
       <h3>Rewards</h3><p>+${res.xp + res.earnedToday} XP today (${res.earnedToday} from your own work) · Manager bonus +${money(res.bonus)} → career bank ${money(G.bank)}</p>
       <div>${res.badges.map(b => `<span class="badge" title="${BADGES[b].desc}">🏅 ${BADGES[b].name}</span>`).join('') || '<span class="mute">No badges today.</span>'}</div>
       <h3>Coach's notes</h3><ul>${res.tips.map(t => `<li>${t}</li>`).join('')}</ul>
-      <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="primary" onclick="UI.hideModal(); startNight();">Clock in for tonight's truck →</button></div>`);
+      <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="primary" onclick="UI.afterSummary()">${G.pendingReview ? 'Read the DM\'s weekly review →' : 'Clock in for tonight\'s truck →'}</button></div>`);
   },
 };
 

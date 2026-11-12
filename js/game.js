@@ -8,7 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1380, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.5'; // bump the last number on every update
+const VERSION = '0.0.6'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -304,8 +304,13 @@ function endDay() {
   res.badges.forEach(b => { G.badges[b] = (G.badges[b] || 0) + 1; });
   G.bank += res.bonus;
   addXP(res.xp);
-  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt });
+  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res) });
   if (G.pastDays.length > 30) G.pastDays.shift();
+  updateRecords(G.pastDays[G.pastDays.length - 1]);
+  if (dowOf(G.day) === 'Fri') {
+    const rv = buildWeekReview(weekOf(G.day));
+    if (rv) { G.reviews = (G.reviews || []).concat([rv]).slice(-12); G.pendingReview = rv; mail('District Manager', `Week ${rv.week} review: ${rv.grade}`, reviewText(rv)); }
+  }
   G.lastResult = res;
   G.phase = 'summary';
   save();
@@ -918,13 +923,13 @@ function blockedAt(x, y, rad) {
 }
 function updatePlayer(dt) {
   const p = G.player, k = RT.keys;
-  let dx = ((k.ArrowRight || k.KeyD) ? 1 : 0) - ((k.ArrowLeft || k.KeyA) ? 1 : 0);
-  let dy = ((k.ArrowDown || k.KeyS) ? 1 : 0) - ((k.ArrowUp || k.KeyW) ? 1 : 0);
+  let dx = ((k.ArrowRight || k.KeyD || k.PadRight) ? 1 : 0) - ((k.ArrowLeft || k.KeyA || k.PadLeft) ? 1 : 0);
+  let dy = ((k.ArrowDown || k.KeyS || k.PadDown) ? 1 : 0) - ((k.ArrowUp || k.KeyW || k.PadUp) ? 1 : 0);
   if (dx || dy) {
     p.work = null;
     const l = Math.hypot(dx, dy); dx /= l; dy /= l;
     p.fx = dx; p.fy = dy;
-    let sp = (k.ShiftLeft || k.ShiftRight) ? 6.5 : 4.2;
+    let sp = (k.ShiftLeft || k.ShiftRight || k.PadRun) ? 6.5 : 4.2;
     if (p.floatId || p.pallet) sp *= 0.75;
     if (!blockedAt(p.x + dx * sp * dt, p.y, 0.3)) p.x += dx * sp * dt;
     if (!blockedAt(p.x, p.y + dy * sp * dt, 0.3)) p.y += dy * sp * dt;
@@ -1128,6 +1133,7 @@ function frame(ts) {
   const dt = Math.min(0.05, (ts - (RT.lastTs || ts)) / 1000);
   RT.lastTs = ts;
   if (G) {
+    pollGamepad();
     if (!isPaused()) {
       updatePlayer(dt);
       for (let i = 0; i < G.speed; i++) { update(dt); if (G.phase !== 'day' && G.phase !== 'night') break; }
