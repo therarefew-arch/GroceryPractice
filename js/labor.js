@@ -186,7 +186,7 @@ function dayDemand(day) {
     dsd: VENDORS.length * STD.dsdPerVendor,
     frozen: cases('FRZ') / STD.coldCPH + STD.frozenDaily,
     truck: dry / STD.dryCPH,
-    rpln: Math.max(STD.rplnMin, units / STD.rplnUnitsPH) + STD.recovery,
+    rpln: Math.max(STD.rplnMin, units / STD.rplnUnitsPH) + STD.recovery + (isResetDay(day) ? RESET_HRS : 0),
     liquor: 0,
     scan: tags * STD.tagHrs + COUNT_PER_DAY * STD.countHrs + STD.reclaimHrs + (dow === 'Tue' ? STD.adFlip : 0) + (dow === 'Wed' ? STD.adVerify : 0),
   };

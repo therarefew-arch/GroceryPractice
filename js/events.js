@@ -223,7 +223,7 @@ function conditionsCheck() {
   return {
     shelves, trash: (G.trash || []).length, tags: G.tags.length, spills: (G.spills || []).length,
     exp: sum(CODE_DEPTS.map(d => codes(d).exp)), cooler: G.cooler && !G.cooler.pulled ? G.cooler.dept : null, coldOut,
-    floorDmg: salesFloorDamages().length, reclaimOld: reclaimOld().length, faceAvg: faceAvg(), faceLow: messiest(), gobacks: (G.gobacks || []).length, strays: strays().length, coldGobacks: coldGobacks().length, bareHoles: holes().filter(o => !o.tagged).length, staleOutTags: (G.whOuts || []).filter(o => o.state === 'pull').length, recallShelf: recallOnShelfLate(),
+    floorDmg: salesFloorDamages().length, reclaimOld: reclaimOld().length, faceAvg: faceAvg(), faceLow: messiest(), gobacks: (G.gobacks || []).length, strays: strays().length, coldGobacks: coldGobacks().length, bareHoles: holes().filter(o => !o.tagged).length, staleOutTags: (G.whOuts || []).filter(o => o.state === 'pull').length, recallShelf: recallOnShelfLate(), resetLate: (G.resets || []).filter(rs => rs.state !== 'done' && G.day > rs.day).length, resetTorn: G.time > OPEN && activeResets().some(resetTorn),
     ...backroomCheck(),
   };
 }
@@ -237,6 +237,8 @@ function dmWalk() {
   else if (c.faceAvg < FACE_GOOD) hit(5, `The store averages ${Math.round(c.faceAvg)}% faced. Make facing part of every walk.`);
   if (c.floorDmg) hit(Math.min(15, c.floorDmg * 5), `${plural(c.floorDmg, 'damaged item')} on the sales floor. Broken product goes straight to reclaim: it cuts people, it looks terrible, and it's credit you're throwing away.`);
   if (c.recallShelf) hit(30, `I found recalled product on your shelf (${plural(c.recallShelf, 'unit')}). That's a customer-safety failure: a recall comes off the shelf the moment the notice comes in.`);
+  if (c.resetLate) hit(10, `The planogram reset is past due. The chain set that aisle on Tuesday; we're still on the old set, and the new items aren't on the shelf.`);
+  else if (c.resetTorn) hit(5, `You're resetting an aisle in the middle of the day. Customers are shopping around a torn-up shelf. Start resets before the doors open.`);
   if (c.bareHoles) hit(5, `${plural(c.bareHoles, 'hole')} from warehouse cuts ${c.bareHoles === 1 ? 'has' : 'have'} no tag. Customers don't know the warehouse is out: put up a "temporarily out" tag.`);
   if (c.staleOutTags) hit(5, `There's a "temporarily out" tag in front of product that's back in stock. Pull it, or customers walk past what we have.`);
   if (c.reclaimOld) hit(10, `Reclaim has product in it from days ago. Old reclaim smells and draws pests, and the system still counts it as sellable. Scan it out every day.`);

@@ -163,6 +163,7 @@ const sweepDue = () => (G.time >= 660 && G.time < 900 && !sweptAfter(660)) || (G
 function helpPlan(c, r) {
   if (G.phase !== 'day') return null;
   return (recallUrgent() ? planRecall(c, r) : null) ||
+    (resetToday() ? planReset(c, r) : null) ||
     (!priceOnShift() ? planPrice(c, r) || planOutTag(c, r) : null) ||
     (gobacksUrgent() ? planGobacks(c, r) : null) ||
     (salesFloorDamages().length ? planDamages(c, r) : null) ||

@@ -96,7 +96,7 @@ function cutsStartDay() {
       : `  • OUT: ${o.item} (${DEPT[o.dept].name}). Every case ordered will be cut. Expected back ${wd(o.back)} (Day ${o.back}).`));
     slipped.forEach(o => L.push(`  • STILL OUT: ${o.item}. The new date is ${wd(o.back)} (Day ${o.back}).`));
     back.forEach(o => L.push(o.kind === 'alloc' ? `  • Allocation lifted: ${o.item}. Order normally.` : `  • BACK IN: ${o.item}. It ships on your next ${DEPT[o.dept].name} order. Take the ${o.recall ? 'recall notice' : '"temporarily out" tag'} down once it's on the shelf.`));
-    const still = knownOuts().filter(o => !news.includes(o) && !slipped.includes(o));
+    const still = knownOuts().filter(o => !o.disc && !news.includes(o) && !slipped.includes(o));
     if (still.length) { L.push('', 'Still out or limited:'); still.forEach(o => L.push(`  • ${o.item}: ${o.kind === 'alloc' ? `max ${o.cap} cs per order` : 'out'} until about ${wd(o.back)}`)); }
     L.push('', 'Your suggested order doesn\'t know about cuts. When an item is out, its customers buy the rest of the department: order that up. Tag every hole so customers know it\'s us, not you.');
     mail('Distribution Center', `Warehouse bulletin: ${[news.length ? `${news.length} new` : '', back.length ? `${back.length} back` : '', slipped.length ? `${slipped.length} delayed` : ''].filter(Boolean).join(', ')}`, L.join('\n'));
@@ -115,12 +115,12 @@ function cutCases(dept, cs) {
   for (let i = cs.length - 1; i >= 0; i--) {
     const it = cs[i].item, o = activeOut(dept, it);
     let why = null;
-    if (o && o.kind === 'out') why = 'out';
+    if (o && o.kind === 'out') why = o.disc ? 'disc' : 'out';
     else if (o && o.kind === 'alloc') { alloc[it] = (alloc[it] || 0) + 1; if (alloc[it] > o.cap) why = 'alloc'; }
     else if (Math.random() < SELECT_SHORT) why = 'select';
     if (!why) continue;
     cs.splice(i, 1); add(it, why, o);
-    if (o) { o.cut++; o.hidden = false; if (o.kind === 'out' && !o.recall) o.hole = true; }
+    if (o) { o.cut++; o.hidden = false; if (o.kind === 'out' && !o.recall && !o.disc) o.hole = true; }
   }
   // an item that's back at the warehouse and shipped tonight is on the shelf tomorrow
   G.whOuts.forEach(o => { if (o.dept === dept && o.state === 'back' && o.hole && !o.restockDay && cs.some(c => c.item === o.item)) o.restockDay = G.day + 1; });
@@ -136,7 +136,7 @@ function invoiceShorts(dept, cs) {
     G.ohErr[dept] += u;
   }
 }
-const CUT_WHY = { out: 'warehouse out', alloc: 'allocation', select: 'short at selection' };
+const CUT_WHY = { out: 'warehouse out', alloc: 'allocation', select: 'short at selection', disc: 'discontinued' };
 function cutReport(order) {
   const rows = RT.cutRows || []; RT.cutRows = null;
   const ordered = sum(Object.values(order).map(n => Math.max(0, Math.floor(n || 0))));
@@ -273,7 +273,7 @@ function cutsOrderPanel(td) {
   const outs = knownOuts().filter(o => deptOnTruck(o.dept, td));
   let h = '<h3>Warehouse</h3>';
   if (!outs.length) h += '<p class="mute">Nothing out or on allocation for tonight\'s departments. A few cases still get cut at selection on any night (about 1%).</p>';
-  else h += '<table><tr><th>Item</th><th>Department</th><th>Status</th><th class="n">Share of dept cases</th></tr>' + outs.map(o => `<tr><td>${o.item}</td><td>${DEPT[o.dept].name}</td><td class="${o.kind === 'alloc' ? 'warn' : 'bad'}">${o.kind === 'alloc' ? `Allocation: max ${plural(o.cap, 'case')} per order` : o.recall ? 'Recalled: every case cut' : 'Out: every case cut'} · until about ${wd(o.back)}</td><td class="n">${Math.round(itemShare(o.dept, o.item) * 100)}%</td></tr>`).join('') + '</table><p class="mute">The suggested order doesn\'t know about cuts. "Ships ≈" is what to expect after known cuts. When an item is out, its customers buy the rest of the department, so order up to cover it.</p>';
+  else h += '<table><tr><th>Item</th><th>Department</th><th>Status</th><th class="n">Share of dept cases</th></tr>' + outs.map(o => `<tr><td>${o.item}</td><td>${DEPT[o.dept].name}</td><td class="${o.kind === 'alloc' ? 'warn' : 'bad'}">${o.kind === 'alloc' ? `Allocation: max ${plural(o.cap, 'case')} per order` : o.disc ? 'Discontinued: every case cut' : o.recall ? 'Recalled: every case cut' : 'Out: every case cut'} · ${o.disc ? 'leaves the shelf at the reset' : `until about ${wd(o.back)}`}</td><td class="n">${Math.round(itemShare(o.dept, o.item) * 100)}%</td></tr>`).join('') + '</table><p class="mute">The suggested order doesn\'t know about cuts. "Ships ≈" is what to expect after known cuts. When an item is out, its customers buy the rest of the department, so order up to cover it.</p>';
   const lg = G.cutLog || [], rep = lg[lg.length - 1];
   if (rep) h += `<p class="mute">Last cut report (${wd(rep.day)} night, Day ${rep.day}): ordered ${rep.ordered}, shipped ${rep.ordered - rep.cut} (${((rep.ordered - rep.cut) / rep.ordered * 100).toFixed(1)}%)${rep.rows.length ? ': ' + rep.rows.map(r => `${r.item} ${r.cs} (${CUT_WHY[r.why]})`).join(', ') : ''}.</p>`;
   return h;

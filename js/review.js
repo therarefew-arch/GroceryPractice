@@ -84,7 +84,7 @@ function buildWeekReview(week) {
   else praise.push(`Labor came in at ${laborPct.toFixed(1)}%, on target.`);
 
   laborReviewNotes(days, note, praise);
-  backroomReviewNotes(days, note); facingReviewNotes(days, note, praise); countsReviewNotes(days, note, praise); damagesReviewNotes(days, note, praise); cutsReviewNotes(days, note, praise); recallsReviewNotes(days, note, praise);
+  backroomReviewNotes(days, note); facingReviewNotes(days, note, praise); countsReviewNotes(days, note, praise); damagesReviewNotes(days, note, praise); cutsReviewNotes(days, note, praise); recallsReviewNotes(days, note, praise); resetsReviewNotes(days, note, praise);
   if (truckDays.length && truckNoon < truckDays.length) note('Truck', `The truck was worked by noon on ${truckNoon} of ${truckDays.length} truck days.`,
     'Freight still out at noon blocks the aisles during the busiest hours, cold product loses life every hour it sits, and backstock never gets run.',
     'Staff the truck shifts to the cases: about 45 cases an hour per person. Break down by aisle so floats go straight to the right aisle, and work cold first.');

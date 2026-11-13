@@ -190,6 +190,7 @@ const UI = {
     h += L.map(t => `<tr><td style="width:28px">${t.status === 'done' ? '<span class="good">✓</span>' : t.status === 'missed' ? '<span class="bad">✗</span>' : '○'}</td><td><b class="${t.status === 'missed' ? 'bad' : ''}">${esc(t.label)}</b><div class="mute">${esc(t.sub)}</div></td><td class="n mute">${t.mode === 'by' ? 'by' : 'at'} ${fmtTime(t.due)}</td></tr>`).join('');
     h += '</table>';
     h += recallTodayHTML();
+    h += resetTodayHTML();
     { const toScan = binToScan(), claim = toScan.filter(d => d.src === 'truck' && d.day === G.day).length, t = G.today;
       h += `<h3>Reclaim</h3><p>${floorDamages().length ? `<span class="warn">${plural(floorDamages().length, 'damaged item')} on the floor.</span> ` : ''}Bin: <b>${toScan.length}</b> to scan${claim ? ` (<span class="good">${claim} truck damage claim${claim === 1 ? '' : 's'}: scan today for full credit</span>)` : ''}, ${binHeld().length} held for DSD vendors. Credits today: <b>${money(t.credits || 0)}</b>, written off ${money(t.dmgLoss || 0)}.</p><p class="mute">The reclaim bin is in the backroom by the office door. Today's truck damage scanned today is a claim (full cost back); other dry damages get 50% reclaim credit; cold damages are thrown away; DSD vendors credit their own damages in full at check-in if they're in the bin.</p>`; }
     h += '<h3>Invoices (last night\'s trucks)</h3><div class="row">';
@@ -455,7 +456,7 @@ const UI = {
       const oh = sysOnHand(d.id), val = cv ? (cur[d.id] || 0) : 0;
       const ds = daysSinceCount(d.id), ohWarn = G.ohFlag && G.ohFlag[d.id] ? ` <span class="bad" title="Customers found the shelf and its bird empty while the system showed stock">⚠ phantom?</span>` : ds == null || ds > 7 ? ` <span class="warn" title="${ds == null ? 'Not counted since you took over' : 'Last counted ' + ds + ' days ago'}">⚠</span>` : '';
       tot += val;
-      h += `<tr><td><span class="dot" style="background:${d.color}"></span><span class="clickable" onclick="UI.drillTo('${d.id}')">${d.name}</span>${cv ? knownOuts(d.id).map(o => `<div class="${o.kind === 'alloc' ? 'warn' : 'bad'}" style="font-size:11px">🚫 ${o.item}: ${o.kind === 'alloc' ? `max ${o.cap} cs` : 'out'}</div>`).join('') : ''}</td><td>${spark(h7)}</td>
+      h += `<tr><td><span class="dot" style="background:${d.color}"></span><span class="clickable" onclick="UI.drillTo('${d.id}')">${d.name}</span>${cv ? knownOuts(d.id).map(o => `<div class="${o.kind === 'alloc' ? 'warn' : 'bad'}" style="font-size:11px">🚫 ${o.item}: ${o.kind === 'alloc' ? `max ${o.cap} cs` : o.disc ? 'discontinued' : 'out'}</div>`).join('') : ''}</td><td>${spark(h7)}</td>
         <td class="n">${Math.round(avgDemand(d.id))}</td><td class="n">${promoLift(d.id) > 1 ? '+' + Math.round((promoLift(d.id) - 1) * 100) + '%' : '—'}</td>
         <td class="n">${cv ? cv + 'd' : '<span class="mute">not tonight</span>'}</td><td class="n">${Math.round(fc)} <span class="mute">(${(fc / d.upc).toFixed(1)} cs)</span></td><td class="n">${Math.round(oh)} <span class="mute">(${(oh / d.upc).toFixed(1)} cs)</span>${ohWarn}</td>
         <td class="n">${dsdUnits(d.id) ? Math.round(dsdUnits(d.id) / d.upc) + ' cs' : '—'}</td><td class="n"><b>${sug[d.id]}</b></td>

@@ -108,6 +108,7 @@ const BADGES = {
   adStar: { name: 'Ad Star', desc: 'Met the district\'s ad endcap request' },
   straightA: { name: 'Straight A', desc: 'Earned an A for the day' },
   coach: { name: 'Coach', desc: 'Coached your crew 4+ times in one day' },
+  resetCrew: { name: 'Reset Crew', desc: 'Planogram reset worked and labeled by noon on reset day' },
   recallReady: { name: 'Recall Ready', desc: 'A recall off the shelf in time, everything pulled and certified' },
   shortStop: { name: 'Short Stop', desc: 'Every warehouse short claimed before the invoice closed' },
   claimsClerk: { name: 'Claims Clerk', desc: 'Every truck damage claimed the same day' },
