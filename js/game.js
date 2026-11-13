@@ -8,7 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1380, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.18'; // bump the last number on every update
+const VERSION = '0.0.19'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -120,11 +120,13 @@ function suggestedCases(dept, td) {
 function suggestedOrder() { const o = {}; DEPTS.forEach(d => { o[d.id] = suggestedCases(d.id); }); return o; }
 
 // ---------- truck ----------
-function buildTruck(order) {
+// night = tonight's real trucks: the warehouse cuts what it can't ship, and now and then a case is short.
+function buildTruck(order, night) {
   const pallets = [], dry = [];
   DEPTS.forEach(d => {
     const n = Math.max(0, Math.floor(order[d.id] || 0));
     const cs = []; for (let i = 0; i < n; i++) cs.push(makeCase(d.id));
+    if (night) { cutCases(d.id, cs); invoiceShorts(d.id, cs); }
     misShip(cs); truckDamage(cs);
     if (d.cold) { for (let i = 0; i < cs.length; i += PALLET_SIZE) pallets.push({ id: nid(), cold: true, cases: cs.slice(i, i + PALLET_SIZE) }); }
     else dry.push(...cs);
@@ -218,6 +220,7 @@ function newGame() {
   ensureFacing();
   ensureCounts();
   ensureDamages();
+  ensureCuts();
   buildTruck(suggestedOrder()).forEach(p => placePallet(p));
   RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {};
   mail('Store Training', 'Welcome to your store!', [
@@ -278,6 +281,7 @@ function startDay() {
   eventsStartDay();
   backroomStartDay();
   countsStartDay();
+  cutsStartDay();
   G.list = buildChecklist();
   shiftStartDay();
   const nt = nextTruckDay(G.day);
@@ -311,9 +315,9 @@ function endDay() {
   RT.vendorNpcs = {}; RT.customers = [];
   G.crew.forEach(despawnCrew);
   tenureDay();
-  countsEndDay(); damagesEndDay();
+  countsEndDay(); damagesEndDay(); cutsEndDay();
   const res = computeResults();
-  res.tips.push(...moraleDay(res), ...eventsTips(), ...backroomTips(), ...facingTips(), ...countsTips(), ...damagesTips());
+  res.tips.push(...moraleDay(res), ...eventsTips(), ...backroomTips(), ...facingTips(), ...countsTips(), ...damagesTips(), ...cutsTips());
   DEPTS.forEach(d => {
     G.history[d.id].push(t.demand[d.id] || 0);
     if (G.history[d.id].length > 14) G.history[d.id].shift();
@@ -322,7 +326,7 @@ function endDay() {
   res.badges.forEach(b => { G.badges[b] = (G.badges[b] || 0) + 1; });
   G.bank += res.bonus;
   addXP(res.xp);
-  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res), ...laborDayExtras(), ...backroomDayExtras(), ...facingDayExtras(), ...countsDayExtras(), ...damagesDayExtras() });
+  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res), ...laborDayExtras(), ...backroomDayExtras(), ...facingDayExtras(), ...countsDayExtras(), ...damagesDayExtras(), ...cutsDayExtras() });
   if (G.pastDays.length > 30) G.pastDays.shift();
   updateRecords(G.pastDays[G.pastDays.length - 1]);
   if (dowOf(G.day) === 'Fri') {
@@ -366,6 +370,7 @@ function computeResults() {
   if (facedAll(90) && !(G.gobacks || []).length) badges.push('facedUp');
   if (countsToday().length && countsToday().every(k => k.status === 'done')) badges.push('countKeeper');
   if (t.claims && !t.claimsMissed) badges.push('claimsClerk');
+  if (shortsToday().length && shortsToday().every(s => s.state === 'claimed')) badges.push('shortStop');
   const tips = [];
   if (t.misses) {
     const worst = Object.entries(t.lost).sort((a, b) => b[1] - a[1])[0];
@@ -395,7 +400,9 @@ function startNight() {
   G.time = CLOSE;
   if (isTruckNight(G.day)) {
     if (!G.orderSubmitted) { G.order = suggestedOrder(); G.today.systemOrder = true; }
-    G.trailer = buildTruck(G.order || suggestedOrder());
+    const ord = G.order || suggestedOrder();
+    G.trailer = buildTruck(ord, true);
+    cutReport(ord);
     toast(`🚚 Tonight's trucks (${trucksOn(G.day).join(', ')}): ${G.trailer.length} pallets. Pull them into Receiving at the dock doors (top-left), or press "End night".`, 'info');
   } else {
     G.trailer = [];
@@ -576,6 +583,7 @@ function buy(cu, dept) {
     }
     return;
   }
+  if (outHole(dept, it, cu, q)) return;
   if (visualOut(dept, cu, q)) return;
   const got = Math.min(q, s.shelf - codeExp(dept));
   s.shelf -= got;
@@ -926,7 +934,7 @@ function brain(c, r) {
     case 'freight': return planFreight(c, r, null, 20) || planBirdRunToday(c, r) || planReplen(c, r, null, 0.6) || planBreakdown(c, r);
     case 'replen': return planBirdRunToday(c, r) || planReplen(c, r, null, 0.75) || planFreight(c, r, null, 25);
     case 'dsd': return planDSD(c, r) || planReplen(c, r, null, 0.6);
-    case 'price': return planPrice(c, r) || planCount(c, r) || planReclaim(c, r) || planReplen(c, r, null, 0.5);
+    case 'price': return planPrice(c, r) || planOutTag(c, r) || planCount(c, r) || planReclaim(c, r) || planReplen(c, r, null, 0.5);
     case 'unloader': return planUnload(c, r) || (backroomUrgent() ? planBackroom(c, r) : null) || planBreakdown(c, r) || planDamages(c, r) || planBackroom(c, r) || planFreight(c, r, null, 20);
     default: {
       const D = [role.dept];
@@ -1123,7 +1131,13 @@ function getInteraction() {
   const br = !p.work && backroomInteraction(p);
   if (br) return br;
   const tag = nearest(G.tags.map(t => ({ x: t.x + 0.5, y: t.y + 0.5, t })), p, 1.5);
-  if (tag) { const t = tag.t; return { label: t.kind === 'error' ? 'Fix scan error (shelf price ≠ register)' : 'Hang price change tag', fn: () => startWork(1.5, t.kind === 'error' ? 'Fixing scan error' : 'Hanging tag', () => { if (G.tags.includes(t)) fixTag(t, true); }), at: tag }; }
+  const oti = !p.work && outTagInteraction(p);
+  if (tag) {
+    const t = tag.t, pt = { label: t.kind === 'error' ? 'Fix scan error (shelf price ≠ register)' : 'Hang price change tag', fn: () => startWork(1.5, t.kind === 'error' ? 'Fixing scan error' : 'Hanging tag', () => { if (G.tags.includes(t)) fixTag(t, true); }), at: tag };
+    if (!oti) return pt;
+    return dist(oti.at, p) < dist(tag, p) ? { ...oti, alt: pt } : { ...pt, alt: oti };
+  }
+  if (oti) return oti;
   if (pal) { const top = pal.cases[pal.cases.length - 1], same = top ? pal.cases.filter(c => c.d === top.d).length : 0; return { label: `Pick up ${same > 1 ? Math.min(same, CARRY_CAP) + ' cases' : 'a case'} (${pal.cases.length} on pallet)`, fn: () => playerPick(pal), at: pal, rep: true }; }
   if (fl) {
     if (fl.claimedBy) return { label: `${crewName(fl.claimedBy)} is about to push this float`, fn: null };
@@ -1276,9 +1290,10 @@ function load() {
     ensureFacing();
     ensureCounts();
     ensureDamages();
+    ensureCuts();
     if (G.phase === 'day' && (!G.counts || G.counts.day !== G.day)) countsStartDay();
     if (!G.list && G.phase === 'day') G.list = buildChecklist();
-    RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {}; RT.faceClaim = {}; RT.gobackClaim = null; RT.countClaim = {}; RT.dmgClaim = null; RT.reclaimClaim = null;
+    RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {}; RT.faceClaim = {}; RT.gobackClaim = null; RT.countClaim = {}; RT.dmgClaim = null; RT.reclaimClaim = null; RT.outTagClaim = {}; RT.holeWarned = {};
     G.vendorsToday.forEach(v => {
       if (v.state === 'waiting') RT.vendorNpcs[v.name] = { x: MAPD.vendorSpot.x + 0.5, y: MAPD.vendorSpot.y + 0.5, fx: 0, fy: 1, path: null, mode: 'wait', v };
     });

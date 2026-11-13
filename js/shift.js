@@ -162,7 +162,7 @@ function planCooler(c, r) {
 const sweepDue = () => (G.time >= 660 && G.time < 900 && !sweptAfter(660)) || (G.time >= 1260 && !sweptAfter(1260));
 function helpPlan(c, r) {
   if (G.phase !== 'day') return null;
-  return (!priceOnShift() ? planPrice(c, r) : null) ||
+  return (!priceOnShift() ? planPrice(c, r) || planOutTag(c, r) : null) ||
     (gobacksUrgent() ? planGobacks(c, r) : null) ||
     (salesFloorDamages().length ? planDamages(c, r) : null) ||
     (!priceOnShift() && reclaimDue() ? planReclaim(c, r) : null) ||

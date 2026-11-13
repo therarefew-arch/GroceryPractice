@@ -199,6 +199,7 @@ const UI = {
     }
     const dsdOk = dsdAllDone(), dsdDone = closed.includes('DSD');
     h += `<button ${dsdDone || !dsdOk ? 'disabled' : ''} onclick="closeInvoice('DSD');UI.render()">${dsdDone ? '✓ ' : ''}DSD vendors${!dsdOk && !dsdDone ? ' (vendors still due)' : ''}</button></div>`;
+    h += cutsTodayHTML();
     const canOOS = G.time >= 1260 && G.today.oosLogged == null;
     h += `<h3>Out-of-stock count</h3><p>${G.today.oosLogged != null ? `Logged tonight: <b>${G.today.oosLogged}</b> (goal ${OOS_GOAL})` : `Walk-count of empty facings, logged after 9 PM once bills are closed. Right now: <b>${oosCount()}</b>.`}</p>`;
     if (canOOS) h += '<button class="primary" onclick="logOOS();UI.render()">Log tonight\'s count</button>';
@@ -443,6 +444,7 @@ const UI = {
     if (editable) h += `<p>Order for <b>tonight's trucks</b> (${WEEKDAY_NAMES[dowIdx(td)]}). Each department's order has to cover the days until its next truck (see Covers). ${G.orderSubmitted ? '<span class="good">✓ Submitted. You can still change and resubmit until the cutoff.</span>' : `<span class="warn">Not submitted yet. Due by ${fmtTime(ORDER_CUTOFF)}.</span>`}</p>`;
     else if (G.phase === 'day' && isTruckNight(G.day)) h += `<p class="warn">The order window closed at ${fmtTime(ORDER_CUTOFF)}. ${G.today.systemOrder ? 'The system order was sent.' : 'Your order is locked in.'}</p>`;
     else h += `<p class="mute">No order due today. Next truck: <b>${WEEKDAY_NAMES[dowIdx(td)]} night</b> (covers ${cover} day${cover > 1 ? 's' : ''}). Preview below.</p>`;
+    h += cutsOrderPanel(td);
     h += `<table><tr><th>Department</th><th>Last 7 days (units)</th><th class="n">Avg/day</th><th class="n">Endcap lift</th><th class="n">Covers</th><th class="n">Forecast</th><th class="n" title="What the system thinks you have. Cycle counts keep it honest.">On hand (system)</th><th class="n">DSD/day</th><th class="n">Suggested</th><th class="n">Order (cs)</th></tr>`;
     let tot = 0;
     for (const d of DEPTS) {
@@ -452,11 +454,11 @@ const UI = {
       const oh = sysOnHand(d.id), val = cv ? (cur[d.id] || 0) : 0;
       const ds = daysSinceCount(d.id), ohWarn = G.ohFlag && G.ohFlag[d.id] ? ` <span class="bad" title="Customers found the shelf and its bird empty while the system showed stock">⚠ phantom?</span>` : ds == null || ds > 7 ? ` <span class="warn" title="${ds == null ? 'Not counted since you took over' : 'Last counted ' + ds + ' days ago'}">⚠</span>` : '';
       tot += val;
-      h += `<tr><td><span class="dot" style="background:${d.color}"></span><span class="clickable" onclick="UI.drillTo('${d.id}')">${d.name}</span></td><td>${spark(h7)}</td>
+      h += `<tr><td><span class="dot" style="background:${d.color}"></span><span class="clickable" onclick="UI.drillTo('${d.id}')">${d.name}</span>${cv ? knownOuts(d.id).map(o => `<div class="${o.kind === 'alloc' ? 'warn' : 'bad'}" style="font-size:11px">🚫 ${o.item}: ${o.kind === 'alloc' ? `max ${o.cap} cs` : 'out'}</div>`).join('') : ''}</td><td>${spark(h7)}</td>
         <td class="n">${Math.round(avgDemand(d.id))}</td><td class="n">${promoLift(d.id) > 1 ? '+' + Math.round((promoLift(d.id) - 1) * 100) + '%' : '—'}</td>
         <td class="n">${cv ? cv + 'd' : '<span class="mute">not tonight</span>'}</td><td class="n">${Math.round(fc)} <span class="mute">(${(fc / d.upc).toFixed(1)} cs)</span></td><td class="n">${Math.round(oh)} <span class="mute">(${(oh / d.upc).toFixed(1)} cs)</span>${ohWarn}</td>
         <td class="n">${dsdUnits(d.id) ? Math.round(dsdUnits(d.id) / d.upc) + ' cs' : '—'}</td><td class="n"><b>${sug[d.id]}</b></td>
-        <td class="n"><input type="number" min="0" max="400" value="${val}" ${editable && cv ? '' : 'disabled'} oninput="UI.setOrder('${d.id}',this.value)"></td></tr>`;
+        <td class="n"><input type="number" min="0" max="400" value="${val}" ${editable && cv ? '' : 'disabled'} oninput="UI.setOrder('${d.id}',this.value)">${cv && knownOuts(d.id).length ? `<div class="mute" style="font-size:11px" id="ship-${d.id}">ships ≈ ${Math.round(val - expectedCut(d.id, val))}</div>` : ''}</td></tr>`;
     }
     h += `<tr><td colspan="9" class="n"><b>Total</b> <span class="mute">(≈ ${Math.max(1, Math.ceil(tot / PALLET_SIZE))} pallets)</span></td><td class="n"><b id="ord-total">${tot}</b> cs</td></tr></table>`;
     if (editable) h += `<div class="row" style="margin-top:10px;justify-content:flex-end"><button onclick="UI.fillSuggested()">Use suggested</button><button class="primary" onclick="UI.submitOrder()">Submit order</button></div>`;
@@ -484,6 +486,7 @@ const UI = {
     if (!G.order) G.order = suggestedOrder();
     G.order[dept] = Math.max(0, Math.floor(+v || 0));
     const el = $('ord-total'); if (el) el.textContent = sum(Object.values(G.order));
+    const sh = $('ship-' + dept); if (sh) sh.textContent = `ships ≈ ${Math.round(G.order[dept] - expectedCut(dept, G.order[dept]))}`;
   },
   fillSuggested() { G.order = suggestedOrder(); this.render(); },
   submitOrder() {

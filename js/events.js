@@ -223,7 +223,7 @@ function conditionsCheck() {
   return {
     shelves, trash: (G.trash || []).length, tags: G.tags.length, spills: (G.spills || []).length,
     exp: sum(CODE_DEPTS.map(d => codes(d).exp)), cooler: G.cooler && !G.cooler.pulled ? G.cooler.dept : null, coldOut,
-    floorDmg: salesFloorDamages().length, reclaimOld: reclaimOld().length, faceAvg: faceAvg(), faceLow: messiest(), gobacks: (G.gobacks || []).length, strays: strays().length, coldGobacks: coldGobacks().length,
+    floorDmg: salesFloorDamages().length, reclaimOld: reclaimOld().length, faceAvg: faceAvg(), faceLow: messiest(), gobacks: (G.gobacks || []).length, strays: strays().length, coldGobacks: coldGobacks().length, bareHoles: holes().filter(o => !o.tagged).length, staleOutTags: (G.whOuts || []).filter(o => o.state === 'pull').length,
     ...backroomCheck(),
   };
 }
@@ -236,6 +236,8 @@ function dmWalk() {
   if (faceOf(c.faceLow) < VISUAL_OUT) hit(15, `${DEPT[c.faceLow].aisle} is only ${Math.round(faceOf(c.faceLow))}% faced. The product is there, but pushed to the back it looks like a hole. Face it, and face every aisle at 5 PM and before close.`);
   else if (c.faceAvg < FACE_GOOD) hit(5, `The store averages ${Math.round(c.faceAvg)}% faced. Make facing part of every walk.`);
   if (c.floorDmg) hit(Math.min(15, c.floorDmg * 5), `${plural(c.floorDmg, 'damaged item')} on the sales floor. Broken product goes straight to reclaim: it cuts people, it looks terrible, and it's credit you're throwing away.`);
+  if (c.bareHoles) hit(5, `${plural(c.bareHoles, 'hole')} from warehouse cuts ${c.bareHoles === 1 ? 'has' : 'have'} no tag. Customers don't know the warehouse is out: put up a "temporarily out" tag.`);
+  if (c.staleOutTags) hit(5, `There's a "temporarily out" tag in front of product that's back in stock. Pull it, or customers walk past what we have.`);
   if (c.reclaimOld) hit(10, `Reclaim has product in it from days ago. Old reclaim smells and draws pests, and the system still counts it as sellable. Scan it out every day.`);
   if (c.gobacks > 10 || c.strays > 2) hit(10, `${c.gobacks} go-backs are waiting${c.strays ? `, ${c.strays} of them dumped on the wrong shelf` : ''}. A go-back is a sale that isn't on its shelf.`);
   if (c.exp) hit(20, `I found ${c.exp} expired units in dairy. That's a food-safety and trust problem. Code check every morning.`);
