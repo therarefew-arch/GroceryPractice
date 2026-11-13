@@ -124,7 +124,7 @@ const UI = {
     const main = this['tab_' + this.tab]();
     const unread = G.emails.filter(m => !m.read).length;
     const tabs = [['today', '📋 Today'], ['dash', '📊 Reports'], ['mail', `📧 Email${unread ? ` (${unread})` : ''}`], ['crew', '👥 Crew'], ['sched', `🗓 Schedule${dowOf(G.day) === 'Thu' && G.sched && G.sched[weekOf(G.day) + 1] && !G.sched[weekOf(G.day) + 1].posted ? ' (!)' : ''}`], ['labor', `📑 Labor${forecastOpen() ? ' (!)' : ''}`], ['hire', '🤝 Hiring'],
-      ['display', '🏷️ Display Planner'], ['order', '📈 Forecast & Order'], ['sir', `🛒 Special Items${(G.sirs || []).some(s => s.status === 'open') ? ' (!)' : ''}`], ['layout', '🧱 Backroom Layout'], ['records', '🏆 Records'], ['help', '❓ Help & Settings']];
+      ['display', '🏷️ Display Planner'], ['order', '📈 Forecast & Order'], ['counts', `🔢 Counts${countsToday().some(k => k.status === 'open') ? ` (${countsToday().filter(k => k.status === 'open').length})` : ''}`], ['sir', `🛒 Special Items${(G.sirs || []).some(s => s.status === 'open') ? ' (!)' : ''}`], ['layout', '🧱 Backroom Layout'], ['records', '🏆 Records'], ['help', '❓ Help & Settings']];
     $('pc-tabs').innerHTML = tabs.map(([k, l]) => `<button class="${this.tab === k ? 'on' : ''}" onclick="UI.setTab('${k}')">${l}</button>`).join('') +
       `<div style="flex:1"></div><div class="mute" style="font-size:12px;padding:6px">The clock is paused while you're logged in.</div>`;
     $('pc-main').innerHTML = main;
@@ -145,6 +145,32 @@ const UI = {
     }
     const past = (G.sirs || []).filter(s => s.status !== 'open').slice().reverse();
     if (past.length) h += '<h3>History</h3><table><tr><th>Item</th><th>Dept</th><th>Result</th><th class="n">Sold last 7 days</th><th>Dropped</th></tr>' + past.map(s => `<tr><td>${esc(s.item)}</td><td>${DEPT[s.dept].name}</td><td>${s.status === 'approved' ? '<span class="good">Carried</span>' : s.status === 'declined' ? 'Declined' : '<span class="bad">No answer</span>'}</td><td class="n">${s.status === 'approved' ? itemWeekUnits(s.item) : '—'}</td><td class="mute">${s.dropped ? esc(s.dropped) + ' (' + s.droppedWk + '/wk)' : ''}</td></tr>`).join('') + '</table>';
+    return h;
+  },
+  tab_counts() {
+    const L = countsToday();
+    let h = `<h2>🔢 Cycle counts</h2><p class="mute">The system's on-hand is what came in on invoices minus what scanned at the register. Theft, mis-shipped cases and short deliveries never reach it, so it drifts, and the suggested order runs off it. Count a department: <b>E at its shelf</b>, then <b>E at its bird</b> in Backstock (either order). When both are counted the system takes your count. A Scan/Price Clerk works the list on their own; department clerks count their own department. You can also order anyone to count (click them on the floor).</p>`;
+    h += '<h3>Today\'s count list</h3>';
+    h += L.length ? '<table><tr><th>Department</th><th>Why</th><th>Shelf</th><th>Backstock</th><th>Result</th></tr>' + L.map(k => {
+      const d = DEPT[k.dept], st = x => (x != null ? '<span class="good">✓</span>' : '○');
+      const res = k.status === 'done' ? `System ${k.sys} → counted <b>${k.counted}</b> <span class="${k.variance < -d.upc ? 'bad' : k.variance > d.upc ? 'warn' : 'good'}">(${k.variance > 0 ? '+' : ''}${k.variance})</span> <span class="mute">by ${esc(k.by)}</span>` : k.status === 'missed' ? '<span class="bad">Missed</span>' : RT.countClaim && RT.countClaim[k.dept] ? `<span class="mute">${esc(crewName(RT.countClaim[k.dept]))} is counting</span>` : '<span class="warn">Open</span>';
+      return `<tr><td><span class="dot" style="background:${d.color}"></span>${d.aisle} ${d.name}</td><td class="mute">${esc(k.why)}</td><td>${st(k.shelf)}</td><td>${st(k.back)}</td><td>${res}</td></tr>`;
+    }).join('') + '</table>' : '<p class="mute">No counts today.</p>';
+    if (G.phase === 'day') h += `<div style="margin:8px 0"><span class="mute">Add a count:</span> ${DEPTS.map(d => `<button ${countOpen(d.id) ? 'disabled' : ''} onclick="countAdd('${d.id}');UI.render()">${d.aisle}</button>`).join('')}</div>`;
+    h += '<h3>On hand by department</h3><table><tr><th>Department</th><th class="n">System on hand</th><th>Last counted</th><th class="n">Last variance</th><th class="n">Empty-shelf flags</th></tr>';
+    for (const d of DEPTS) {
+      const lg = G.countLog[d.id], n = daysSinceCount(d.id), oh = sysOnHand(d.id), fl = G.ohFlag[d.id] || 0;
+      h += `<tr><td><span class="dot" style="background:${d.color}"></span>${d.aisle} ${d.name}</td><td class="n">${oh} <span class="mute">(${(oh / d.upc).toFixed(1)} cs)</span></td>
+        <td class="${n == null || n > 7 ? 'warn' : ''}">${n == null ? 'Not since you took over' : n === 0 ? 'Today' : n + ' day' + (n === 1 ? '' : 's') + ' ago'}</td>
+        <td class="n">${lg ? `<span class="${Math.abs(lg.variance) > d.upc ? (lg.variance < 0 ? 'bad' : 'warn') : 'good'}">${lg.variance > 0 ? '+' : ''}${lg.variance}</span>` : '—'}</td><td class="n ${fl ? 'bad' : 'mute'}">${fl || '—'}</td></tr>`;
+    }
+    h += '</table><p class="mute">Empty-shelf flags: customers found the shelf <i>and</i> its bird empty while the system still showed at least a case. That\'s phantom inventory, and it goes to the top of tomorrow\'s list.</p>';
+    const hist = (G.countHist || []).slice(-12).reverse();
+    if (hist.length) {
+      const wk = (G.countHist || []).filter(x => x.day > G.day - 7), ok = wk.filter(x => x.ok).length;
+      h += `<h3>Recent counts</h3><p class="mute">Last 7 days: <b>${ok} of ${wk.length}</b> counts were within tolerance (±3% or 3 units) of the system. The rest were drift the system didn't know about.</p><table><tr><th>Day</th><th>Department</th><th class="n">System</th><th class="n">Counted</th><th class="n">Variance</th><th>By</th></tr>` +
+        hist.map(x => `<tr><td class="mute">${dayLabel(x.day)}</td><td>${DEPT[x.dept].aisle} ${DEPT[x.dept].name}</td><td class="n">${x.sys}</td><td class="n">${x.counted}</td><td class="n ${x.ok ? 'good' : x.variance < 0 ? 'bad' : 'warn'}">${x.variance > 0 ? '+' : ''}${x.variance}</td><td class="mute">${esc(x.by)}</td></tr>`).join('') + '</table>';
+    }
     return h;
   },
   tab_records() {
@@ -413,23 +439,24 @@ const UI = {
     if (editable) h += `<p>Order for <b>tonight's trucks</b> (${WEEKDAY_NAMES[dowIdx(td)]}). Each department's order has to cover the days until its next truck (see Covers). ${G.orderSubmitted ? '<span class="good">✓ Submitted. You can still change and resubmit until the cutoff.</span>' : `<span class="warn">Not submitted yet. Due by ${fmtTime(ORDER_CUTOFF)}.</span>`}</p>`;
     else if (G.phase === 'day' && isTruckNight(G.day)) h += `<p class="warn">The order window closed at ${fmtTime(ORDER_CUTOFF)}. ${G.today.systemOrder ? 'The system order was sent.' : 'Your order is locked in.'}</p>`;
     else h += `<p class="mute">No order due today. Next truck: <b>${WEEKDAY_NAMES[dowIdx(td)]} night</b> (covers ${cover} day${cover > 1 ? 's' : ''}). Preview below.</p>`;
-    h += `<table><tr><th>Department</th><th>Last 7 days (units)</th><th class="n">Avg/day</th><th class="n">Endcap lift</th><th class="n">Covers</th><th class="n">Forecast</th><th class="n">On hand</th><th class="n">DSD/day</th><th class="n">Suggested</th><th class="n">Order (cs)</th></tr>`;
+    h += `<table><tr><th>Department</th><th>Last 7 days (units)</th><th class="n">Avg/day</th><th class="n">Endcap lift</th><th class="n">Covers</th><th class="n">Forecast</th><th class="n" title="What the system thinks you have. Cycle counts keep it honest.">On hand (system)</th><th class="n">DSD/day</th><th class="n">Suggested</th><th class="n">Order (cs)</th></tr>`;
     let tot = 0;
     for (const d of DEPTS) {
       const h7 = G.history[d.id].slice(-7);
       const cv = coverDaysFor(d.id, td);
       let fc = 0; for (let k = 1; k <= cv; k++) fc += forecastFor(d.id, td + k);
-      const oh = onHandUnits(d.id), val = cv ? (cur[d.id] || 0) : 0;
+      const oh = sysOnHand(d.id), val = cv ? (cur[d.id] || 0) : 0;
+      const ds = daysSinceCount(d.id), ohWarn = G.ohFlag && G.ohFlag[d.id] ? ` <span class="bad" title="Customers found the shelf and its bird empty while the system showed stock">⚠ phantom?</span>` : ds == null || ds > 7 ? ` <span class="warn" title="${ds == null ? 'Not counted since you took over' : 'Last counted ' + ds + ' days ago'}">⚠</span>` : '';
       tot += val;
       h += `<tr><td><span class="dot" style="background:${d.color}"></span><span class="clickable" onclick="UI.drillTo('${d.id}')">${d.name}</span></td><td>${spark(h7)}</td>
         <td class="n">${Math.round(avgDemand(d.id))}</td><td class="n">${promoLift(d.id) > 1 ? '+' + Math.round((promoLift(d.id) - 1) * 100) + '%' : '—'}</td>
-        <td class="n">${cv ? cv + 'd' : '<span class="mute">not tonight</span>'}</td><td class="n">${Math.round(fc)} <span class="mute">(${(fc / d.upc).toFixed(1)} cs)</span></td><td class="n">${Math.round(oh)} <span class="mute">(${(oh / d.upc).toFixed(1)} cs)</span></td>
+        <td class="n">${cv ? cv + 'd' : '<span class="mute">not tonight</span>'}</td><td class="n">${Math.round(fc)} <span class="mute">(${(fc / d.upc).toFixed(1)} cs)</span></td><td class="n">${Math.round(oh)} <span class="mute">(${(oh / d.upc).toFixed(1)} cs)</span>${ohWarn}</td>
         <td class="n">${dsdUnits(d.id) ? Math.round(dsdUnits(d.id) / d.upc) + ' cs' : '—'}</td><td class="n"><b>${sug[d.id]}</b></td>
         <td class="n"><input type="number" min="0" max="400" value="${val}" ${editable && cv ? '' : 'disabled'} oninput="UI.setOrder('${d.id}',this.value)"></td></tr>`;
     }
     h += `<tr><td colspan="9" class="n"><b>Total</b> <span class="mute">(≈ ${Math.max(1, Math.ceil(tot / PALLET_SIZE))} pallets)</span></td><td class="n"><b id="ord-total">${tot}</b> cs</td></tr></table>`;
     if (editable) h += `<div class="row" style="margin-top:10px;justify-content:flex-end"><button onclick="UI.fillSuggested()">Use suggested</button><button class="primary" onclick="UI.submitOrder()">Submit order</button></div>`;
-    h += `<p class="mute">Suggested = forecast for the days this truck covers + 25% of the first day (safety stock) − (on hand − what still sells before the truck) − 80% of expected DSD, rounded up to cases. Daily forecast = 7-day average demand (sales + lost sales) × endcap lift × day-of-week factor (${WEEKDAYS.map(w => w + ' ' + DOW_FACTOR[w]).join(', ')}). Click a department for item detail.</p>`;
+    h += `<p class="mute">On hand is the <b>system's</b> number: invoices in, register scans out. Theft, mis-shipped cases and short DSD deliveries never reach it, so it drifts. ⚠ = not counted in a week (or never), <span class="bad">⚠ phantom?</span> = customers found the shelf and its bird empty while the system showed stock. Count those first (🔢 Counts), then order.</p><p class="mute">Suggested = forecast for the days this truck covers + 25% of the first day (safety stock) − (on hand − what still sells before the truck) − 80% of expected DSD, rounded up to cases. Daily forecast = 7-day average demand (sales + lost sales) × endcap lift × day-of-week factor (${WEEKDAYS.map(w => w + ' ' + DOW_FACTOR[w]).join(', ')}). Click a department for item detail.</p>`;
     if (this.drill) {
       const d = DEPT[this.drill];
       const rows = d.items.map(([n]) => {

@@ -8,7 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1380, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.16'; // bump the last number on every update
+const VERSION = '0.0.17'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -114,7 +114,7 @@ function suggestedCases(dept, td) {
   // what will still sell between now and the truck night
   let before = 0;
   for (let k = G.day; k <= td; k++) before += forecastFor(dept, k) * (k === G.day ? (G.phase === 'day' ? trafficRemaining(G.time) : 0) : 1);
-  need += forecastFor(dept, td + 1) * 0.25 - (onHandUnits(dept) - before) - dsdUnits(dept) * 0.8 * cover;
+  need += forecastFor(dept, td + 1) * 0.25 - (sysOnHand(dept) - before) - dsdUnits(dept) * 0.8 * cover;
   return Math.max(0, Math.ceil(need / d.upc));
 }
 function suggestedOrder() { const o = {}; DEPTS.forEach(d => { o[d.id] = suggestedCases(d.id); }); return o; }
@@ -125,6 +125,7 @@ function buildTruck(order) {
   DEPTS.forEach(d => {
     const n = Math.max(0, Math.floor(order[d.id] || 0));
     const cs = []; for (let i = 0; i < n; i++) cs.push(makeCase(d.id));
+    misShip(cs);
     if (d.cold) { for (let i = 0; i < cs.length; i += PALLET_SIZE) pallets.push({ id: nid(), cold: true, cases: cs.slice(i, i + PALLET_SIZE) }); }
     else dry.push(...cs);
   });
@@ -215,6 +216,7 @@ function newGame() {
   G.trash = [];
   ensureBackroom();
   ensureFacing();
+  ensureCounts();
   buildTruck(suggestedOrder()).forEach(p => placePallet(p));
   RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {};
   mail('Store Training', 'Welcome to your store!', [
@@ -274,6 +276,7 @@ function startDay() {
   }
   eventsStartDay();
   backroomStartDay();
+  countsStartDay();
   G.list = buildChecklist();
   shiftStartDay();
   const nt = nextTruckDay(G.day);
@@ -307,8 +310,9 @@ function endDay() {
   RT.vendorNpcs = {}; RT.customers = [];
   G.crew.forEach(despawnCrew);
   tenureDay();
+  countsEndDay();
   const res = computeResults();
-  res.tips.push(...moraleDay(res), ...eventsTips(), ...backroomTips(), ...facingTips());
+  res.tips.push(...moraleDay(res), ...eventsTips(), ...backroomTips(), ...facingTips(), ...countsTips());
   DEPTS.forEach(d => {
     G.history[d.id].push(t.demand[d.id] || 0);
     if (G.history[d.id].length > 14) G.history[d.id].shift();
@@ -317,7 +321,7 @@ function endDay() {
   res.badges.forEach(b => { G.badges[b] = (G.badges[b] || 0) + 1; });
   G.bank += res.bonus;
   addXP(res.xp);
-  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res), ...laborDayExtras(), ...backroomDayExtras(), ...facingDayExtras() });
+  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res), ...laborDayExtras(), ...backroomDayExtras(), ...facingDayExtras(), ...countsDayExtras() });
   if (G.pastDays.length > 30) G.pastDays.shift();
   updateRecords(G.pastDays[G.pastDays.length - 1]);
   if (dowOf(G.day) === 'Fri') {
@@ -359,6 +363,7 @@ function computeResults() {
   if (grade === 'A') badges.push('straightA');
   if ((t.coached || 0) >= 4) badges.push('coach');
   if (facedAll(90) && !(G.gobacks || []).length) badges.push('facedUp');
+  if (countsToday().length && countsToday().every(k => k.status === 'done')) badges.push('countKeeper');
   const tips = [];
   if (t.misses) {
     const worst = Object.entries(t.lost).sort((a, b) => b[1] - a[1])[0];
@@ -559,6 +564,7 @@ function buy(cu, dept) {
   t.itemDemand[it] = (t.itemDemand[it] || 0) + q;
   if (s.shelf - codeExp(dept) <= 0) {
     t.misses++;
+    countsOnOut(dept);
     t.lost[dept] = (t.lost[dept] || 0) + q;
     G.sat = Math.max(0, G.sat - 0.7);
     cu.emote = '!'; cu.emoteT = 2.5;
@@ -575,6 +581,7 @@ function buy(cu, dept) {
   t.units[dept] = (t.units[dept] || 0) + got;
   G.sat = Math.min(100, G.sat + 0.06);
   shopMess(dept, got, cu);
+  countsOnBuy(dept, got);
   const tag = G.tags.find(tg => tg.dept === dept && tg.kind === 'error') || G.tags.find(tg => tg.dept === dept);
   if (tag && Math.random() < (tag.kind === 'error' ? 0.08 : 0.03)) {
     t.scanLoss += 2.5; G.sat = Math.max(0, G.sat - 0.5);
@@ -838,7 +845,7 @@ function planDSD(c, r) {
     { wait: 2.5, label: 'Checking in vendor' },
     { do: () => {
       if (v.state !== 'waiting') return false;
-      if (v.cases > 1 && rollMistake(c, 'dsd', 0.3)) { const short = Math.min(2, v.cases - 1); v.cases -= short; G.today.shrink += short * DEPT[v.dept].upc * DEPT[v.dept].price * 0.6; }
+      if (v.cases > 1 && rollMistake(c, 'dsd', 0.3)) { const short = Math.min(2, v.cases - 1); v.cases -= short; G.today.shrink += short * DEPT[v.dept].upc * DEPT[v.dept].price * 0.6; G.ohErr[v.dept] += short * DEPT[v.dept].upc; }
       checkInVendor(v, false); return true;
     } },
   ];
@@ -914,11 +921,11 @@ function brain(c, r) {
     case 'freight': return planFreight(c, r, null, 20) || planBirdRunToday(c, r) || planReplen(c, r, null, 0.6) || planBreakdown(c, r);
     case 'replen': return planBirdRunToday(c, r) || planReplen(c, r, null, 0.75) || planFreight(c, r, null, 25);
     case 'dsd': return planDSD(c, r) || planReplen(c, r, null, 0.6);
-    case 'price': return planPrice(c, r) || planReplen(c, r, null, 0.5);
+    case 'price': return planPrice(c, r) || planCount(c, r) || planReplen(c, r, null, 0.5);
     case 'unloader': return planUnload(c, r) || (backroomUrgent() ? planBackroom(c, r) : null) || planBreakdown(c, r) || planBackroom(c, r) || planFreight(c, r, null, 20);
     default: {
       const D = [role.dept];
-      return planReplen(c, r, D, 0.85) || planFreight(c, r, D, 6) || planBreakdown(c, r, D) ||
+      return planReplen(c, r, D, 0.85) || planFreight(c, r, D, 6) || planBreakdown(c, r, D) || planCount(c, r, D) ||
         (backCases(role.dept) >= 3 && shelfPct(role.dept) < 0.95 ? planBirdRun(c, r, role.dept) : null) || planFace(c, r, role.dept);
     }
   }
@@ -1120,11 +1127,15 @@ function getInteraction() {
     const n = backCases(bird.dept), d = DEPT[bird.dept];
     const push = { label: `Push the ${d.aisle} bird (${plural(n, 'case')})`, fn: () => grabBird(bird), at: bird };
     const pull = n ? { label: `Carry ${Math.min(n, CARRY_CAP)} cs`, fn: () => playerPullBack(bird.dept), at: bird } : null;
+    const cb = !p.work && countBackAction(bird);
+    if (cb) return { ...cb, alt: { label: 'Push the bird', fn: push.fn } };
     if (shelfDept === bird.dept && n && canStock(bird.dept)) return { label: `Work backstock onto ${d.name} (${plural(n, 'case')} on the bird)`, fn: () => playerWorkBird(bird), at: bird, alt: { label: 'Push the bird', fn: push.fn } };
     return { ...push, alt: pull };
   }
   const ev2 = !p.work && eventsInteraction(p, shelfDept, false);
   if (ev2) return ev2;
+  const cs = !p.work && shelfDept && countShelfAction(shelfDept, shelf);
+  if (cs) { const fi = faceInteraction(shelfDept, shelf); return fi ? { ...cs, alt: fi } : cs; }
   const mi = !p.work && moraleInteraction(p);
   const fi = !p.work && faceInteraction(shelfDept, shelf);
   if (fi) return mi ? { ...fi, alt: mi } : fi;
@@ -1255,8 +1266,10 @@ function load() {
     ensureBackroom();
     ensureLayout();
     ensureFacing();
+    ensureCounts();
+    if (G.phase === 'day' && (!G.counts || G.counts.day !== G.day)) countsStartDay();
     if (!G.list && G.phase === 'day') G.list = buildChecklist();
-    RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {}; RT.faceClaim = {}; RT.gobackClaim = null;
+    RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {}; RT.faceClaim = {}; RT.gobackClaim = null; RT.countClaim = {};
     G.vendorsToday.forEach(v => {
       if (v.state === 'waiting') RT.vendorNpcs[v.name] = { x: MAPD.vendorSpot.x + 0.5, y: MAPD.vendorSpot.y + 0.5, fx: 0, fy: 1, path: null, mode: 'wait', v };
     });

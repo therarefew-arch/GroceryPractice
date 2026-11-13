@@ -85,6 +85,9 @@ const TRUCK_SCHEDULE = {
 const BACKSTOCK_RUNS = { Sat: ['A2', 'HBC'], Sun: [], Mon: ['A3', 'A4'], Tue: ['A2', 'HBC'], Wed: ['A1'], Thu: ['A3', 'A4'], Fri: ['A1', 'A2'] };
 const BLITZ_TIMES = [420, 540, 660, 780, 900, 1020, 1140]; // Fri–Sun blitz: 7a 9a 11a 1p 3p 5p 7p
 const CLOSERS_REQUIRED = 3; // store rule: 3 grocery closers a night
+// Unknown shrink: chance per unit sold that one more walks out unscanned (theft).
+// The system never sees it, so it shows up as phantom on-hand until somebody counts.
+const THEFT_RATE = { A1: 0.01, A2: 0.03, A3: 0.01, A4: 0.02, HBC: 0.06, DAI: 0.015, FRZ: 0.015 };
 const OOS_GOAL = 40;        // nightly out-of-stock count goal (empty facings)
 const BREAK_MIN = 60;       // unpaid break for shifts longer than 6 hours
 // On a truck day the order must be in by this time, or the system's suggested order is sent.
@@ -105,6 +108,7 @@ const BADGES = {
   adStar: { name: 'Ad Star', desc: 'Met the district\'s ad endcap request' },
   straightA: { name: 'Straight A', desc: 'Earned an A for the day' },
   coach: { name: 'Coach', desc: 'Coached your crew 4+ times in one day' },
+  countKeeper: { name: 'Count Keeper', desc: 'Every cycle count on the list done' },
   facedUp: { name: 'Faced Up', desc: 'Every aisle 90%+ faced at close with no go-backs left' },
 };
 

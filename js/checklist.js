@@ -44,6 +44,7 @@ const TASK_CHECK = {
   empties: () => !G.empties.length,
   floatsStraight: () => !crookedFloats().length,
   birds: () => !birdsOnFloor().length,
+  counts: () => countsToday().length > 0 && countsToday().every(k => k.status === 'done'),
   faced: a => G.time >= (a.from || 0) && facedAll(a.pct),
   gobacks: a => (G.gobacks || []).length <= (a.max || 0) && !coldGobacks().length,
   forecast: () => { const f = G.fc && G.fc[weekOf(G.day) + 1]; return !!f && f.by === 'you'; },
@@ -58,6 +59,7 @@ function buildChecklist() {
   add('codes', 'codes', 'Dairy code check', 'Pull expired, mark down short-dated, rotate oldest to the front (E at the dairy shelf)', 600, 'by', { dept: 'DAI' });
   (BACKSTOCK_RUNS[dow] || []).forEach(d => add('bs-' + d, 'backstock', `Backstock run: ${DEPT[d].aisle} birds`, 'Work backstock to the shelf by noon', 720, 'by', { dept: d }));
   const trucks = lastNightTrucks();
+  if (countsToday().length) add('counts', 'counts', `Cycle counts: ${countsToday().map(k => DEPT[k.dept].aisle).join(', ')}`, 'Count each shelf (E) and its backstock bird (E) so the system on-hand is right before you order', 1260, 'by');
   add('invoices', 'invoices', `Invoices closed: ${trucks.join(', ')} + DSD`, 'Office computer → Today. A truck closes once its freight is worked', 1370, 'by');
   if (dow === 'Mon') add('forecast', 'forecast', 'Forecast next week', `Office computer → Labor. Window closes ${fmtTime(FORECAST_CUTOFF)}`, FORECAST_CUTOFF, 'by');
   if (dow === 'Thu') add('schedule', 'schedule', 'Post next week\'s schedule', 'Check it against labor demand first (Schedule + Labor tabs)', SCHED_CUTOFF, 'by');

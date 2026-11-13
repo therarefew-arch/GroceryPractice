@@ -15,6 +15,8 @@ const TRAIN_AREAS = {
     tip: 'Match the UPC on the tag to the item, not just the description.' },
   dsd: { name: 'DSD receiving', mistake: 'Signed for a short delivery',
     tip: 'Count every case against the invoice before you sign.' },
+  count: { name: 'Counting', mistake: 'Miscounted a cycle count',
+    tip: 'Count every facing all the way to the back, then the backstock. If the number looks wrong, count it again before you post it.' },
   focus: { name: 'Focus', mistake: 'Took a phone break on the clock',
     tip: 'Phones stay in the breakroom. Breaks are on the schedule.' },
 };
@@ -32,6 +34,9 @@ function ensureTrain(c, base) {
     c.train = {};
     for (const k in TRAIN_AREAS) c.train[k] = clamp(Math.round(b + rand(-4, 4)), 0, 100);
   }
+  // a training area added after they were hired starts near their average
+  const known = Object.values(c.train).filter(v => v != null), avg = known.length ? known.reduce((a, b) => a + b, 0) / known.length : 30;
+  for (const k in TRAIN_AREAS) if (c.train[k] == null) c.train[k] = clamp(Math.round(avg - 5), 0, 100);
   if (c.coached == null) c.coached = 0;
   if (c.days == null) c.days = 0;
   if (c.mistakes == null) c.mistakes = 0;

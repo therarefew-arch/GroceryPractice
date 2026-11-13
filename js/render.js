@@ -511,6 +511,7 @@ function render() {
   G.floats.forEach(drawFloatMaybeCrooked);
   drawBirds();
   drawGobacks();
+  drawCountMarks();
   RT.customers.forEach(drawCustomer);
   Object.values(RT.vendorNpcs).forEach(drawVendor);
   G.crew.forEach(c => { const r = RT.crew[c.id]; if (r && r.inBuilding) drawCrew(c, r); });
