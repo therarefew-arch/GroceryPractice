@@ -8,7 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1380, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.29'; // bump the last number on every update
+const VERSION = '0.0.30'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -229,7 +229,7 @@ function newGame() {
   ensureRecalls();
   ensureResets();
   buildTruck(suggestedOrder()).forEach(p => placePallet(p));
-  RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {};
+  RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.repNpc = null; RT.replenClaim = {};
   mail('Store Training', 'Welcome to your store!', [
     'Welcome aboard! Last night\'s truck is sitting in Receiving (top-left, yellow area).',
     '',
@@ -278,6 +278,7 @@ function startDay() {
   });
   timeoffCallouts();
   weatherStartDay();
+  repsStartDay();
   const dowNow = dowOf(G.day);
   if (!G.ad && G.day === 1) G.ad = { depts: shuffle(DEPTS.map(d => d.id)).slice(0, 2), from: 1 };
   if (dowNow === 'Mon') {
@@ -331,7 +332,7 @@ function endDay() {
   tenureDay();
   countsEndDay(); damagesEndDay(); cutsEndDay(); recallsEndDay(); resetsEndDay(); endcapsEndDay(); perfEndDay();
   const res = computeResults();
-  res.tips.push(...moraleDay(res), ...eventsTips(), ...backroomTips(), ...facingTips(), ...countsTips(), ...damagesTips(), ...cutsTips(), ...recallsTips(), ...resetsTips(), ...endcapsTips(), ...timeoffTips(), ...interviewTips(), ...huddleTips(), ...perfTips(), ...custTips(), ...weatherTips());
+  res.tips.push(...moraleDay(res), ...eventsTips(), ...backroomTips(), ...facingTips(), ...countsTips(), ...damagesTips(), ...cutsTips(), ...recallsTips(), ...resetsTips(), ...endcapsTips(), ...timeoffTips(), ...interviewTips(), ...huddleTips(), ...perfTips(), ...custTips(), ...weatherTips(), ...repsTips());
   DEPTS.forEach(d => {
     G.history[d.id].push(t.demand[d.id] || 0);
     if (G.history[d.id].length > 14) G.history[d.id].shift();
@@ -340,7 +341,7 @@ function endDay() {
   res.badges.forEach(b => { G.badges[b] = (G.badges[b] || 0) + 1; });
   G.bank += res.bonus;
   addXP(res.xp);
-  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res), ...laborDayExtras(), ...backroomDayExtras(), ...facingDayExtras(), ...countsDayExtras(), ...damagesDayExtras(), ...cutsDayExtras(), ...recallsDayExtras(), ...resetsDayExtras(), ...endcapsDayExtras(), ...timeoffDayExtras(), ...interviewDayExtras(), ...huddleDayExtras(), ...perfDayExtras(), ...custDayExtras(), ...weatherDayExtras(), ...pnlDayExtras() });
+  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res), ...laborDayExtras(), ...backroomDayExtras(), ...facingDayExtras(), ...countsDayExtras(), ...damagesDayExtras(), ...cutsDayExtras(), ...recallsDayExtras(), ...resetsDayExtras(), ...endcapsDayExtras(), ...timeoffDayExtras(), ...interviewDayExtras(), ...huddleDayExtras(), ...perfDayExtras(), ...custDayExtras(), ...weatherDayExtras(), ...pnlDayExtras(), ...repsDayExtras() });
   if (G.pastDays.length > 30) G.pastDays.shift();
   updateRecords(G.pastDays[G.pastDays.length - 1]);
   if (dowOf(G.day) === 'Fri') {
@@ -482,6 +483,7 @@ function update(dt) {
       if (G.tags.length > before) toast(`A customer reported a scan error in ${DEPT[G.tags[G.tags.length - 1].dept].name}.`, 'warn');
     }
     updateVendors(dt);
+    updateReps(dt);
     updateCustomers(dt);
     if (!G.today.truckDoneAt && G.today.truckCases > 0 && truckRemaining() === 0) {
       G.today.truckDoneAt = G.time;
@@ -545,7 +547,7 @@ function spawnCustomers(gm) {
 function spawnCustomer() {
   const n = randi(2, 4), stops = [], pool = DEPTS.slice();
   for (let i = 0; i < n && pool.length; i++) {
-    const d = wpick(pool, x => x.demand * x.upc * promoLift(x.id) * catalogFactor(x.id) * seasonLift(x.id, G.day) * wxLift(x.id, G.day));
+    const d = wpick(pool, x => x.demand * x.upc * promoLift(x.id) * catalogFactor(x.id) * seasonLift(x.id, G.day) * wxLift(x.id, G.day) * repLift(x.id, G.day));
     stops.push(d.id); pool.splice(pool.indexOf(d), 1);
   }
   const door = pick(MAPD.frontDoor);
@@ -585,7 +587,7 @@ function updateCustomers(dt) {
 function buy(cu, dept) {
   const d = DEPT[dept], s = G.stock[dept], t = G.today;
   let q = randi(1, 3) + (endcapCount(dept) && Math.random() < 0.3 ? 1 : 0);
-  const sl = seasonLift(dept, G.day) * wxLift(dept, G.day);
+  const sl = seasonLift(dept, G.day) * wxLift(dept, G.day) * repLift(dept, G.day);
   if (sl > 1 && Math.random() < Math.min(1, (sl - 1) * 1.6)) q++;
   t.requests++;
   t.demand[dept] = (t.demand[dept] || 0) + q;
@@ -1157,6 +1159,8 @@ function getInteraction() {
   if (rci) return rci;
   const cri = !p.work && !pushing && custInteraction(p);
   if (cri) return cri;
+  const rpi = !p.work && !pushing && repInteraction(p);
+  if (rpi) return rpi;
   const mti = !p.work && !pushing && matInteraction(p);
   if (mti) return mti;
   const eci = !p.work && !pushing && endcapInteraction(p);
@@ -1333,7 +1337,7 @@ function load() {
     (G.candidates || []).forEach(k => { if (!k.rel) makeApplicantTruth(k); });
     if (G.phase === 'day' && (!G.counts || G.counts.day !== G.day)) countsStartDay();
     if (!G.list && G.phase === 'day') G.list = buildChecklist();
-    RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {}; RT.faceClaim = {}; RT.gobackClaim = null; RT.countClaim = {}; RT.dmgClaim = null; RT.reclaimClaim = null; RT.outTagClaim = {}; RT.holeWarned = {}; RT.recallClaim = {}; RT.recallWarned = {}; RT.resetWorkers = {};
+    RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.repNpc = null; RT.replenClaim = {}; RT.faceClaim = {}; RT.gobackClaim = null; RT.countClaim = {}; RT.dmgClaim = null; RT.reclaimClaim = null; RT.outTagClaim = {}; RT.holeWarned = {}; RT.recallClaim = {}; RT.recallWarned = {}; RT.resetWorkers = {};
     G.vendorsToday.forEach(v => {
       if (v.state === 'waiting') RT.vendorNpcs[v.name] = { x: MAPD.vendorSpot.x + 0.5, y: MAPD.vendorSpot.y + 0.5, fx: 0, fy: 1, path: null, mode: 'wait', v };
     });

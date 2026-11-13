@@ -34,6 +34,7 @@ const TASK_CHECK = {
   pto: () => !ptoPending().length,
   reviews: () => !reviewsDue().length,
   huddle: () => huddleHeld(),
+  rep: a => { const v = (G.repVisits || []).find(x => x.id === a.id); return !v || v.state === 'met'; },
   ecfill: () => MAPD.endcaps.every(e => !G.endcaps[e.id] || (ecStockOf(e.id) > 0 && !ecLow(e))),
   recallshelf: a => { const rs = recallById(a.id); return !rs || rs.shelfAt != null; },
   recallall: a => { const rs = recallById(a.id); return !rs || (rs.shelfAt != null && rs.backAt != null && !recallFreight(rs).length); },
@@ -81,6 +82,7 @@ function buildChecklist() {
   if (dow === 'Mon' && G.nextAd) add('adplan', 'adflip', 'Plan spots for tomorrow\'s ad chart', `New ad: ${G.nextAd.map(d => DEPT[d].name).join(' & ')}`, 1375, 'at');
   if (dow === 'Tue' && G.nextAd) add('adflip', 'adflip', 'Ad flip tonight', `Switch 2 endcaps each to ${G.nextAd.map(d => DEPT[d].name).join(' & ')} (from 6 PM, E at the endcap)`, 1375, 'at');
   if (mgrHuddleDay(G.day)) add('huddle', 'huddle', 'Morning huddle', 'Break room before 8 AM: yesterday, today, one priority, one shout-out', HUDDLE_TO, 'by');
+  repToday().forEach(v => add('rep-' + v.id, 'rep', `Meet the ${v.co} rep (${fmtTime(v.time)})`, 'In the office: E at the rep. Yes to what helps the store, no to the rest', v.time + REP_WAIT, 'by', { id: v.id }));
   if (reviewsDue().length) add('reviews', 'reviews', 'Performance reviews', `Due: ${reviewsDue().map(c => c.name).join(', ')} (Crew tab)`, 1380, 'by');
   if (ptoPending().length) add('pto', 'pto', 'Answer time-off requests', `${plural(ptoPending().length, 'request')} waiting (🗓 Schedule)`, 1020, 'at');
   if (MAPD.endcaps.some(e => G.endcaps[e.id])) add('ecfill', 'ecfill', 'Endcaps full', 'Every endcap display at least half full', 1020, 'at');
