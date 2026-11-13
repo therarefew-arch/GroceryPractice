@@ -613,6 +613,16 @@ const UI = {
     this.showModal(`<h2>${esc(title)}</h2><p>${esc(body)}</p><div class="row" style="justify-content:flex-end;margin-top:12px"><button onclick="UI.hideModal()">${esc(no || 'Cancel')}</button><button class="${danger ? 'danger' : 'primary'}" onclick="UI.hideModal(); const f = UI._askYes; UI._askYes = null; if (f) f();">${esc(yes)}</button></div>`);
   },
   huddle() { this.showModal(huddleSheetHTML()); },
+  custReq(cu) {
+    this._cu = cu;
+    this.showModal(`<h2>🙋 A customer needs help</h2><p style="font-size:17px"><i>${esc(custPrompt(cu))}</i></p><div style="margin-top:10px">${shuffle(custChoices(cu)).map(([k, txt]) => `<button style="display:block;width:100%;text-align:left;margin:6px 0" onclick="UI.custPick('${k}')">${esc(txt)}</button>`).join('')}</div><div class="row" style="justify-content:flex-end;margin-top:8px"><button onclick="RT.custHelping = null; UI.hideModal()">Not now</button></div>`);
+  },
+  custPick(key) {
+    const cu = this._cu; this._cu = null;
+    const r = cu && cu.req ? custAnswer(cu, key) : null;
+    if (!r) { this.hideModal(); return; }
+    this.showModal(`<h2>${r.good === 'best' ? '✅' : r.good === 'bad' ? '❌' : '➖'} ${esc(r.title)}</h2><p>${esc(r.why)}</p><div class="row" style="justify-content:flex-end;margin-top:12px"><button class="primary" onclick="UI.hideModal()">Back to work</button></div>`);
+  },
   review(id) { const c = G.crew.find(x => x.id === id); if (c && reviewDue(c)) this.showModal(reviewSheetHTML(c)); },
   reviewSubmit(id) {
     const rates = {}; for (const k of Object.keys(PERF_CATS)) rates[k] = +document.getElementById('rv-' + k).value;

@@ -429,6 +429,7 @@ function drawCrew(c, r) {
 function drawCustomer(cu) {
   if (cu._seed == null) cu._seed = (Math.random() * 1000) | 0;
   const top = pixelPerson(cu, cu.color, { seed: cu._seed, u: 1.5, pants: '#3a3f4a' });
+  if (cu.req) { drawCustReqMark(cu, top); return; }
   if (cu.emoteT > 0) {
     ctx.fillStyle = '#fff'; ctx.fillRect(Math.round(cu.x * T - 9), Math.round(top - 16), 18, 12);
     ctx.fillStyle = '#fff'; ctx.fillRect(Math.round(cu.x * T - 2), Math.round(top - 4), 4, 3);
