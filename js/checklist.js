@@ -44,6 +44,8 @@ const TASK_CHECK = {
   empties: () => !G.empties.length,
   floatsStraight: () => !crookedFloats().length,
   birds: () => !birdsOnFloor().length,
+  faced: a => G.time >= (a.from || 0) && facedAll(a.pct),
+  gobacks: a => (G.gobacks || []).length <= (a.max || 0) && !coldGobacks().length,
   forecast: () => { const f = G.fc && G.fc[weekOf(G.day) + 1]; return !!f && f.by === 'you'; },
   schedule: () => { const s = G.sched && G.sched[weekOf(G.day) + 1]; return !!s && s.posted && s.postedBy === 'you'; },
 };
@@ -63,9 +65,12 @@ function buildChecklist() {
   if (dow === 'Tue' && G.nextAd) add('adflip', 'adflip', 'Ad flip tonight', `Set 2 endcaps each for ${G.nextAd.map(d => DEPT[d].name).join(' & ')} before close`, 1375, 'at');
   if (dow === 'Wed' && G.ad) add('adverify', 'adverify', 'Verify the new ad', 'Ad endcaps up and those shelves 60%+ by noon', 720, 'at');
   if (['Fri', 'Sat', 'Sun'].includes(dow)) BLITZ_TIMES.forEach(t => add('blitz-' + t, 'blitz', `Blitz ${fmtTime(t)}`, 'Every department 40%+', t, 'at'));
+  add('face5', 'faced', 'Recovery at 5 PM: face every aisle', 'Every aisle 85%+ faced between 5 and 6 PM, before the dinner rush', 1080, 'by', { pct: FACE_GOOD, from: 1020 });
   add('dairy6', 'shelf', 'Dairy hole check (6 PM)', 'Dairy 80%+ at 6:00 PM', 1080, 'at', { dept: 'DAI', pct: 0.8 });
   if (maxCrew() >= 6) add('closers', 'closers', `${CLOSERS_REQUIRED} closers on the schedule`, 'Store rule: 3 grocery closers a night', 840, 'at');
   add('closerun', 'shelves', 'Close run: water, milk, eggs, ice', 'Beverage, dairy and frozen 85%+ at 10:45 PM', 1365, 'at', { depts: ['A2', 'DAI', 'FRZ'], pct: 0.85 });
+  add('faceclose', 'faced', 'Close recovery: face every aisle', 'Every aisle 85%+ faced at 10:50 PM', 1370, 'at', { pct: FACE_GOOD });
+  add('gobacks', 'gobacks', 'Go-backs worked', 'Go-back cart and strays cleared at 10:50 PM (2 or fewer, nothing cold)', 1370, 'at', { max: 2 });
   add('sweep-mid', 'swept', 'Mid-day backroom sweep', 'E anywhere in the backroom, between 11 AM and 3 PM', 900, 'by', { after: 660 });
   add('birds', 'birds', 'No birds on the sales floor', 'Every bird is parked in BACKSTOCK and nothing overflows (checked at 2 PM)', 840, 'at');
   add('empties', 'empties', 'Empty pallets stacked in reload staging', 'Nothing left on the receiving spots at close', 1375, 'at');

@@ -110,7 +110,9 @@ li { margin: 3px 0; }
 /* ---------- Phones & tablets (touch) ---------- */
 #touch { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
 #joy { position: absolute; left: calc(18px + env(safe-area-inset-left)); bottom: 52px; width: 132px; height: 132px; border-radius: 50%;
-  background: radial-gradient(circle, #ffb2381a, #0008 70%); border: 2px solid #ffb23866; pointer-events: auto; touch-action: none; }
+  background: radial-gradient(circle, #ffb2381a, #0008 70%); border: 2px solid #ffb23866; pointer-events: none; opacity: 0.5; transition: opacity .15s; }
+#joy.live { opacity: 1; transition: none; }
+#joyzone { position: absolute; left: 0; width: 55%; top: 50%; bottom: 0; pointer-events: auto; touch-action: none; }
 #joy-knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%;
   background: #ffb238aa; border: 2px solid #ffd27a; box-shadow: 0 0 12px #ffb23888; }
 #tbtns { position: absolute; right: calc(16px + env(safe-area-inset-right)); bottom: 52px; display: grid; grid-template-columns: auto auto; gap: 10px; align-items: end; pointer-events: auto; touch-action: none; }

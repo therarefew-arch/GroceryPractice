@@ -1,7 +1,7 @@
 'use strict';
 // =====================================================================
-//  Phone / tablet controls: an on-screen joystick (left) and buttons
-//  (right). Turned on automatically on touch screens; add ?touch=1 to the
+//  Phone / tablet controls: a floating joystick (thumb down anywhere on
+//  the left) and buttons (right). Turned on automatically on touch screens; add ?touch=1 to the
 //  URL to force it on, or ?touch=0 to turn it off.
 // =====================================================================
 const TOUCH = (() => {
@@ -38,24 +38,47 @@ function setupTouch() {
     </div>`;
   document.body.appendChild(el);
 
-  // ---- joystick ----
+  // ---- joystick: it floats. Put your thumb down anywhere in the left part of the
+  // screen and the stick starts right there; drag past the edge and it follows you.
+  // A quick tap (no drag) passes through to the game, so you can still tap crew.
+  const zone = document.createElement('div'); zone.id = 'joyzone'; el.prepend(zone);
   const joy = el.querySelector('#joy'), knob = el.querySelector('#joy-knob');
-  let jid = null;
-  const setDir = (dx, dy) => {
-    const k = RT.keys;
-    RT.touchJoy = { x: dx, y: dy }; // analog: any direction, push further to go faster
-  };
+  let jid = null, cx = 0, cy = 0, sx = 0, sy = 0, t0 = 0, moved = false;
+  const R = () => joy.offsetWidth / 2;
+  const setBase = (x, y) => { const r = R(); cx = x; cy = y; joy.style.left = (cx - r) + 'px'; joy.style.top = (cy - r) + 'px'; joy.style.bottom = 'auto'; };
+  const rest = () => { joy.style.left = joy.style.top = joy.style.bottom = ''; joy.classList.remove('live'); knob.style.transform = ''; RT.touchJoy = { x: 0, y: 0 }; };
   const move = e => {
-    const b = joy.getBoundingClientRect(), r = b.width / 2;
-    let dx = (e.clientX - b.left - r) / r, dy = (e.clientY - b.top - r) / r;
-    const l = Math.hypot(dx, dy); if (l > 1) { dx /= l; dy /= l; }
-    knob.style.transform = `translate(${dx * r * 0.6}px, ${dy * r * 0.6}px)`;
-    setDir(dx, dy);
+    const r = R();
+    let dx = e.clientX - cx, dy = e.clientY - cy;
+    const l = Math.hypot(dx, dy);
+    if (l > r) { setBase(cx + dx / l * (l - r), cy + dy / l * (l - r)); dx = dx / l * r; dy = dy / l * r; }
+    if (Math.hypot(e.clientX - sx, e.clientY - sy) > 10) moved = true;
+    knob.style.transform = `translate(${dx * 0.6}px, ${dy * 0.6}px)`;
+    RT.touchJoy = { x: dx / r, y: dy / r }; // analog: any direction, push further to go faster
   };
-  const end = () => { jid = null; knob.style.transform = ''; setDir(0, 0); };
-  joy.addEventListener('pointerdown', e => { e.preventDefault(); jid = e.pointerId; try { joy.setPointerCapture(jid); } catch (err) { /* ignore */ } move(e); });
-  joy.addEventListener('pointermove', e => { if (e.pointerId === jid) move(e); });
-  joy.addEventListener('pointerup', end); joy.addEventListener('pointercancel', end);
+  const tapThrough = (x, y) => {
+    const b = canvas.getBoundingClientRect();
+    if (x < b.left || x > b.right || y < b.top || y > b.bottom) return;
+    canvas.dispatchEvent(new PointerEvent('pointerdown', { clientX: x, clientY: y, bubbles: true }));
+    canvas.dispatchEvent(new MouseEvent('click', { clientX: x, clientY: y, bubbles: true }));
+  };
+  zone.addEventListener('pointerdown', e => {
+    if (jid != null) return;
+    e.preventDefault(); jid = e.pointerId; sx = e.clientX; sy = e.clientY; t0 = performance.now(); moved = false;
+    try { zone.setPointerCapture(jid); } catch (err) { /* ignore */ }
+    const r = R();
+    setBase(clamp(e.clientX, r + 4, innerWidth - r - 4), clamp(e.clientY, r + 4, innerHeight - r - 4));
+    joy.classList.add('live');
+    move(e);
+  });
+  zone.addEventListener('pointermove', e => { if (e.pointerId === jid) move(e); });
+  const end = (e, cancel) => {
+    if (e.pointerId !== jid) return;
+    jid = null; rest();
+    if (!cancel && !moved && performance.now() - t0 < 300) tapThrough(e.clientX, e.clientY);
+  };
+  zone.addEventListener('pointerup', e => end(e)); zone.addEventListener('pointercancel', e => end(e, true));
+  layoutJoyZone();
 
   // ---- buttons ----
   const tap = (id, fn) => el.querySelector(id).addEventListener('pointerdown', e => { e.preventDefault(); fn(e); });
@@ -85,7 +108,18 @@ function setupTouch() {
   // No pinch-zoom / double-tap zoom on the page itself.
   document.addEventListener('gesturestart', e => e.preventDefault());
   document.addEventListener('dblclick', e => e.preventDefault());
-  window.addEventListener('orientationchange', () => setTimeout(fit, 300));
+  window.addEventListener('orientationchange', () => setTimeout(() => { fit(); layoutJoyZone(); }, 300));
+  window.addEventListener('resize', () => setTimeout(layoutJoyZone, 60));
+}
+
+// Where the floating joystick listens. Phone upright: everything under the game.
+// Sideways: the lower-left of the screen, above the action prompt.
+function layoutJoyZone() {
+  const zone = $('joyzone'), bar = $('bar'); if (!zone || !bar) return;
+  const b = bar.getBoundingClientRect(), H = innerHeight;
+  RT.joyLayoutAt = performance.now();
+  if (H - b.bottom >= 150) { zone.style.top = Math.round(b.bottom) + 'px'; zone.style.bottom = '0px'; }
+  else { zone.style.top = Math.round(H * 0.4) + 'px'; zone.style.bottom = Math.max(0, Math.round(H - b.top)) + 'px'; }
 }
 
 // Hide the on-screen controls while the computer or a popup is open.
@@ -95,6 +129,7 @@ function touchFrame() {
   el.classList.toggle('hidden', !!(UI.open || RT.modal || (G && G.player.away)));
   const q = $('t-q'); if (q) { const a = RT.curIt && RT.curIt.alt && RT.curIt.alt.fn; q.classList.toggle('hidden', !a); if (a) q.title = RT.curIt.alt.label; }
   const p = $('t-pause'); if (p) p.textContent = RT.paused ? '▶' : '⏸';
+  if (performance.now() - (RT.joyLayoutAt || 0) > 1000) layoutJoyZone();
 }
 
 // ---- Add to Home Screen / offline ----

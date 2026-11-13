@@ -28,6 +28,7 @@ const STD = {
   dsdPerVendor: 0.5,
   rplnUnitsPH: 350, // units sold per replenishment hour
   rplnMin: 3,
+  recovery: 1.5,    // facing and go-backs at 5 PM and close
   tagHrs: 0.25,     // per price change tag
   adFlip: 3,        // Tue night
   adVerify: 1,      // Wed
@@ -183,7 +184,7 @@ function dayDemand(day) {
     dsd: VENDORS.length * STD.dsdPerVendor,
     frozen: cases('FRZ') / STD.coldCPH + STD.frozenDaily,
     truck: dry / STD.dryCPH,
-    rpln: Math.max(STD.rplnMin, units / STD.rplnUnitsPH),
+    rpln: Math.max(STD.rplnMin, units / STD.rplnUnitsPH) + STD.recovery,
     liquor: 0,
     scan: tags * STD.tagHrs + (dow === 'Tue' ? STD.adFlip : 0) + (dow === 'Wed' ? STD.adVerify : 0),
   };

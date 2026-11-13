@@ -70,6 +70,7 @@ const UI = {
     if (p.carry.length) hold = 'Holding: ' + p.carry.map(caseLabel).join(' · ');
     else if (p.floatId) { const f = floatById(p.floatId); if (f) hold = `Pushing ${DEPT[f.dept].aisle} ${DEPT[f.dept].name} float · ${plural(f.cases.length, 'case')}`; }
     else if (p.pallet) hold = `Pallet jack: ${plural(p.pallet.cases.length, 'case')}${p.pallet.cold ? ' (cold)' : ''}`;
+    if (p.gobacks && p.gobacks.length) hold += (hold ? ' · ' : '') + `Go-backs: ${gbSummary(p.gobacks)}`;
     $('holding').textContent = hold;
     touchFrame();
     const now = performance.now();
@@ -82,6 +83,7 @@ const UI = {
     if (G.phase === 'night') return G.trailer.length ? 'Night: pull pallets off the trailer at the dock doors (top-left), or press "End night".' : 'Trailer empty! Break down pallets or press "End night" to start tomorrow.';
     if (G.phase === 'day' && G.time < OPEN) return 'Doors open at 7:00 AM — get freight on the shelves.';
     if (G.vendorsToday.some(v => v.state === 'waiting')) return 'A DSD vendor is waiting at the back door (green DSD door).';
+    if (recoveryNow() && (!facedAll(FACE_GOOD) || gobacksCart().length)) return `Recovery time: face every aisle (lowest ${DEPT[messiest()].aisle} ${Math.round(faceOf(messiest()))}%) and clear the go-back cart at the front end (${gobacksCart().length}).`;
     return '';
   },
 

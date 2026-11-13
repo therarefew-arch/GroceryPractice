@@ -105,6 +105,7 @@ const BADGES = {
   adStar: { name: 'Ad Star', desc: 'Met the district\'s ad endcap request' },
   straightA: { name: 'Straight A', desc: 'Earned an A for the day' },
   coach: { name: 'Coach', desc: 'Coached your crew 4+ times in one day' },
+  facedUp: { name: 'Faced Up', desc: 'Every aisle 90%+ faced at close with no go-backs left' },
 };
 
 const FIRST_NAMES = ['Alex', 'Jordan', 'Sam', 'Taylor', 'Casey', 'Riley', 'Morgan', 'Jamie', 'Quinn', 'Avery', 'Devon', 'Reese', 'Skyler',

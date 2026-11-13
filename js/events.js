@@ -222,6 +222,7 @@ function conditionsCheck() {
   return {
     shelves, trash: (G.trash || []).length, tags: G.tags.length, spills: (G.spills || []).length,
     exp: sum(CODE_DEPTS.map(d => codes(d).exp)), cooler: G.cooler && !G.cooler.pulled ? G.cooler.dept : null, coldOut,
+    faceAvg: faceAvg(), faceLow: messiest(), gobacks: (G.gobacks || []).length, strays: strays().length, coldGobacks: coldGobacks().length,
     ...backroomCheck(),
   };
 }
@@ -231,6 +232,9 @@ function dmWalk() {
   const hit = (pts, txt) => { score -= pts; notes.push(txt); };
   if (c.shelves < 0.6) hit(25, `Shelves are only ${Math.round(c.shelves * 100)}% full on average. Customers judge the whole store by the holes. Fill from backstock first.`);
   else if (c.shelves < 0.75) hit(10, `Shelves average ${Math.round(c.shelves * 100)}%. Not bad, but I can see holes from the front end.`);
+  if (faceOf(c.faceLow) < VISUAL_OUT) hit(15, `${DEPT[c.faceLow].aisle} is only ${Math.round(faceOf(c.faceLow))}% faced. The product is there, but pushed to the back it looks like a hole. Face it, and face every aisle at 5 PM and before close.`);
+  else if (c.faceAvg < FACE_GOOD) hit(5, `The store averages ${Math.round(c.faceAvg)}% faced. Make facing part of every walk.`);
+  if (c.gobacks > 10 || c.strays > 2) hit(10, `${c.gobacks} go-backs are waiting${c.strays ? `, ${c.strays} of them dumped on the wrong shelf` : ''}. A go-back is a sale that isn't on its shelf.`);
   if (c.exp) hit(20, `I found ${c.exp} expired units in dairy. That's a food-safety and trust problem. Code check every morning.`);
   if (c.spills) hit(15, `There's a spill on the floor right now. That's a lawsuit waiting to happen.`);
   if (c.cooler) hit(20, `The ${DEPT[c.cooler].name} case is down and the product is still in it. Pull product first, then call maintenance.`);
@@ -257,6 +261,7 @@ function inspection() {
   if (c.spills) v.push(['Slip hazard', 'An uncleaned spill on the sales floor.', 'Spills must be blocked off and cleaned immediately.']);
   if (c.dirt > 60) v.push(['Unsanitary backroom', `The backroom floor is dirty (${Math.round(c.dirt)}%).`, 'Debris and spilled product attract pests. Sweep mid-day and at close, every day.']);
   if (c.birds.length) v.push(['Blocked aisle', `Backstock parked in ${c.birds.map(d => DEPT[d].aisle).join(', ')}.`, 'Aisles must stay clear for customers and for an emergency exit.']);
+  if (c.coldGobacks > 2) v.push(['Cold product out of the cooler', `${c.coldGobacks} dairy/frozen go-backs sitting at room temperature.`, 'Cold go-backs go back to the cooler first, within 30 minutes, or they get thrown away.']);
   if (c.trash > 3) v.push(['Housekeeping', `${c.trash} pieces of cardboard on the floor.`, 'Clutter hides hazards and attracts pests. Clean as you go.']);
   const pass = v.length === 0, score = Math.max(0, 100 - v.length * 15 - (c.exp ? 10 : 0));
   G.today.inspection = { pass, score };

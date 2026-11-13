@@ -230,11 +230,12 @@ function drawBG() {
     const d = DEPT[SHELF_DEPT[ch]];
     const cx = gx * T + T / 2, cy = 11.45 * T;
     const w = nameplate(g, d.aisle.toUpperCase(), cx, cy - 5, { font: PX(8), h: 12 });
+    (MAPD.signs = MAPD.signs || {})[SHELF_DEPT[ch]] = { x: Math.round(cx - w / 2), y: Math.round(cy + 13), w };
     g.fillStyle = '#0d1626'; g.fillRect(Math.round(cx - w / 2), Math.round(cy + 1), w, 10);
     g.fillStyle = d.color; g.fillRect(Math.round(cx - w / 2), Math.round(cy + 10), w, 2);
     label(g, d.name.toUpperCase(), cx, cy + 6, { font: PX(6, false), color: '#9fc8e6' });
   }
-  nameplate(g, 'DAIRY', 37.5 * T + 2, 11.0 * T, { font: PX(8), h: 12, edge: DEPT.DAI.color });
+  { const w = nameplate(g, 'DAIRY', 37.5 * T + 2, 11.0 * T, { font: PX(8), h: 12, edge: DEPT.DAI.color }); (MAPD.signs = MAPD.signs || {}).DAI = { x: Math.round(37.5 * T + 2 - w / 2), y: Math.round(11.0 * T + 8), w }; }
   return b;
 }
 
@@ -255,6 +256,7 @@ function drawOverlay() {
 function drawShelves() {
   for (const dept in MAPD.shelfTiles) {
     const d = DEPT[dept], pct = shelfPct(dept), out = G.stock[dept].shelf <= 0;
+    const mess = 1 - faceOf(dept) / 100; // unfaced product sits pushed back and in shadow
     const cold = d.cold;
     for (const t of MAPD.shelfTiles[dept]) {
       const px = t.x * T, py = t.y * T;
@@ -265,9 +267,12 @@ function drawShelves() {
       const filled = Math.round(local * 9);
       for (let i = 0; i < 9; i++) {
         const cx = i % 3, cy = (i / 3) | 0;
-        ctx.fillStyle = (8 - i) < filled ? d.color : 'rgba(255,255,255,0.05)';
-        ctx.fillRect(px + 6 + cx * 7, py + 5 + cy * 8, 6, 6);
-        if ((8 - i) < filled) { ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(px + 6 + cx * 7, py + 5 + cy * 8, 6, 1); }
+        const has = (8 - i) < filled, messy = has && noise(t.x * 9 + i, t.y * 5 + 3) < mess * 1.15;
+        const sx = px + 6 + cx * 7, sy = py + 5 + cy * 8 - (messy ? 2 : 0);
+        ctx.fillStyle = has ? d.color : 'rgba(255,255,255,0.05)';
+        ctx.fillRect(sx, sy, messy ? 5 : 6, messy ? 5 : 6);
+        if (messy) { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(sx, sy, 5, 5); }
+        else if (has) { ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(sx, sy, 6, 1); }
       }
       if (out) {
         const a = 0.5 + 0.5 * Math.sin(performance.now() / 180);
@@ -500,15 +505,16 @@ function render() {
   ctx.fillStyle = PAL.void; ctx.fillRect(0, 0, canvas.width, canvas.height);
   applyCamera();
   ctx.drawImage(BG, 0, 0);
-  drawShelves(); drawEndcaps(); drawTags(); drawTrash(); drawEvents(); drawBackroom();
+  drawShelves(); drawFaceBars(); drawEndcaps(); drawTags(); drawTrash(); drawEvents(); drawBackroom();
   if (G.phase === 'night') drawTrailer();
   G.pallets.forEach(p => drawPallet(p));
   G.floats.forEach(drawFloatMaybeCrooked);
   drawBirds();
+  drawGobacks();
   RT.customers.forEach(drawCustomer);
   Object.values(RT.vendorNpcs).forEach(drawVendor);
   G.crew.forEach(c => { const r = RT.crew[c.id]; if (r && r.inBuilding) drawCrew(c, r); });
-  if (!G.player.away) { drawTarget(); drawPlayer(); }
+  if (!G.player.away) { drawTarget(); drawPlayer(); drawHeldGobacks(G.player); }
   RT.floaters.forEach(f => {
     ctx.globalAlpha = clamp(1.4 - f.t, 0, 1);
     label(ctx, f.text, f.x * T, f.y * T, { font: PX(10), color: f.color, outline: 'rgba(0,0,0,0.9)' });

@@ -46,6 +46,7 @@ function clockOut(quiet) {
   if (p.carry.length) playerCarryToBack();
   if (p.floatId) releaseFloat(true);
   if (p.birdId) releaseBird(false);
+  if (p.gobacks && p.gobacks.length) playerDropGobacks();
   if (p.pallet) {
     if (p.pallet.empty) G.empties.push({ id: p.pallet.id, x: p.x, y: p.y });
     else if (G.phase === 'night') G.trailer.unshift(p.pallet);
@@ -155,16 +156,18 @@ function planCooler(c, r) {
     { do: () => { if (G.cooler !== k || k.pulled) return false; pullCooler(c); return true; } },
   ];
 }
-// When their own job has nothing left: tags (if no price clerk), birds, holes, sweeping, facing.
+// When their own job has nothing left: tags (if no price clerk), cold or piled-up go-backs, birds, holes,
+// sweeping, then facing the messiest aisle and clearing any go-backs.
 const sweepDue = () => (G.time >= 660 && G.time < 900 && !sweptAfter(660)) || (G.time >= 1260 && !sweptAfter(1260));
 function helpPlan(c, r) {
   if (G.phase !== 'day') return null;
   return (!priceOnShift() ? planPrice(c, r) : null) ||
+    (gobacksUrgent() ? planGobacks(c, r) : null) ||
     planReturnBird(c, r) ||
     planBirdRunToday(c, r) ||
     planReplen(c, r, null, 0.9) ||
     (sweepDue() && G.dirt >= 5 && !RT.sweepClaim ? planSweep(c, r) : null) ||
-    (G.time >= OPEN ? planFace(c, r, pick(DEPTS).id) : null);
+    (G.time >= OPEN ? planFaceMessiest(c, r, 90) || planGobacks(c, r) : null);
 }
 function planSweep(c, r) {
   RT.sweepClaim = c.id;

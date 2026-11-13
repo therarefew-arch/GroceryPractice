@@ -16,7 +16,7 @@ GRIPE_TEXT.micro = 'I got pulled off my work every five minutes. I never got to 
 const ROLE_KINDS = {
   breakdown: ['truck', 'breakdown', 'freight', 'backroom', 'trash'],
   freight: ['truck', 'freight', 'fill', 'bird', 'trash'],
-  replen: ['fill', 'bird', 'face', 'trash'],
+  replen: ['fill', 'bird', 'face', 'gobacks', 'trash'],
   dsd: ['dsd', 'fill'],
   price: ['price', 'fill'],
   unloader: ['unload', 'truck', 'breakdown', 'backroom'],
@@ -29,6 +29,7 @@ const ORDERS = {
   fill: { name: 'Fill holes', dept: true, desc: 'Fill the shelf from backstock, then from that department\'s freight' },
   bird: { name: 'Run the bird', dept: true, desc: 'Push this aisle\'s backstock bird out, work it onto the shelf, bring it back' },
   face: { name: 'Face the aisle', dept: true, desc: 'Pull product forward so the shelf looks full' },
+  gobacks: { name: 'Work go-backs', desc: 'Clear the go-back cart and any strays, cold first, back to their own shelves' },
   dsd: { name: 'Watch the back door', desc: 'Check in DSD vendors as they arrive' },
   price: { name: 'Hang price tags', desc: 'Hang tags and fix scan errors' },
   trash: { name: 'Pick up cardboard', desc: 'Clear cardboard off the floor' },
@@ -74,6 +75,7 @@ function orderPlan(c, r) {
     case 'fill': p = shelfPct(o.dept) >= 0.98 ? null : (planReplen(c, r, D, 0.98) || planFreight(c, r, D, 1) || planBreakdown(c, r, D)); break;
     case 'face': p = planFace(c, r, o.dept); break;
     case 'bird': p = planBirdRun(c, r, o.dept); break;
+    case 'gobacks': p = planGobacks(c, r); break;
     case 'price': p = planPrice(c, r); break;
     case 'trash': p = planTrash(c, r); break;
     case 'backroom': p = planBackroomForced(c, r); break;
@@ -138,8 +140,8 @@ function showOrders(c) {
   h += deptRow('freight', d => { const n = palletCases(d) + (floatOf(d) ? floatOf(d).cases.length : 0); return n ? n + ' cs' : '—'; });
   h += deptRow('fill', d => `${Math.round(shelfPct(d) * 100)}%`);
   h += deptRow('bird', d => `${backCases(d)} cs`);
-  h += deptRow('face', () => '');
-  h += `<div style="margin:6px 0"><b>Other</b><div>${btn('dsd', null, waiting ? `${waiting} waiting` : '')}${btn('price', null, `${G.tags.length} tags`)}${btn('trash', null, `${trashN}`)}${btn('backroom', null, `dirt ${Math.round(G.dirt || 0)}%`)}</div></div>`;
+  h += deptRow('face', d => `${Math.round(faceOf(d))}%`);
+  h += `<div style="margin:6px 0"><b>Other</b><div>${btn('dsd', null, waiting ? `${waiting} waiting` : '')}${btn('gobacks', null, `${(G.gobacks || []).length}`)}${btn('price', null, `${G.tags.length} tags`)}${btn('trash', null, `${trashN}`)}${btn('backroom', null, `dirt ${Math.round(G.dirt || 0)}%`)}</div></div>`;
   h += `<div class="row" style="justify-content:flex-end;margin-top:10px"><button class="primary" onclick="UI.hideModal()">Done</button></div>`;
   UI.showModal(h);
 }
