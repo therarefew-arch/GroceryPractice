@@ -413,18 +413,33 @@ const UI = {
 
   tab_hire() {
     const full = G.crew.length >= maxCrew();
-    let h = `<h2>Hiring</h2><p class="mute">New applicants every morning. ${full ? '<span class="warn">All crew slots are full — let someone go or level up.</span>' : `Open slots: ${maxCrew() - G.crew.length}.`} You can change a hire's role and shift later in Crew and 🗓 Schedule.</p><div class="cand">`;
-    h += G.candidates.map(c => `<div class="card"><div class="v" style="font-size:16px">${esc(c.name)}</div><div><span class="dot" style="background:${ROLES[c.role].color}"></span>${ROLES[c.role].name}</div>
-      <div class="s" style="margin:4px 0">${ROLES[c.role].desc}</div><div>${stars(c.skill)} · <b>$${c.wage.toFixed(2)}/hr</b></div><div class="s">Training: ${c.exp != null ? c.exp : 0}% · new hires need coaching</div><div class="s">Wants: ${SHIFTS[c.shift].name}</div><div class="s">Available: ${availText(c.avail)}</div>
-      <button class="primary" ${full ? 'disabled' : ''} onclick="UI.hire(${c.id})" style="margin-top:8px">Hire</button></div>`).join('') || '<p class="mute">No applicants left today. Check back tomorrow.</p>';
-    h += '</div><p class="mute">Skill sets walking and working speed (★1 ≈ 82%, ★5 ≈ 130%). More skill costs more per hour.</p>';
+    const ivLeft = IV_PER_DAY - (G.today.interviews || 0);
+    let h = `<h2>Hiring</h2><p class="mute">New applicants every morning. ${full ? '<span class="warn">All crew slots are full — let someone go or level up.</span>' : `Open slots: ${maxCrew() - G.crew.length}.`} A résumé only tells you so much: <b>interview</b> first (${IV_QUESTIONS} questions each, ${ivLeft} interview${ivLeft === 1 ? '' : 's'} left today). You can change a hire's role and shift later in Crew and 🗓 Schedule.</p><div class="cand">`;
+    h += G.candidates.map(c => `<div class="card"${this.ivId === c.id ? ' style="outline:2px solid #ffd34d"' : ''}><div class="v" style="font-size:16px">${esc(c.name)}</div><div><span class="dot" style="background:${ROLES[c.role].color}"></span>${ROLES[c.role].name}</div>
+      <div class="s" style="margin:4px 0">${ROLES[c.role].desc}</div><div><b>$${c.wage.toFixed(2)}/hr</b> · wants ${SHIFTS[c.shift].name}</div>${applicantNotes(c).map(x => `<div class="s">${x}</div>`).join('')}
+      ${c.withdrew ? '<div class="bad" style="margin-top:8px">Withdrew their application</div>' : `<div class="row" style="margin-top:8px">${!c.iv ? `<button ${ivLeft <= 0 ? 'disabled' : ''} onclick="UI.interview(${c.id})">🗣 Interview</button> ` : c.iv.done ? '' : `<button onclick="UI.ivId=${c.id};UI.render()">🗣 Continue</button> `}<button class="${c.iv ? 'primary' : ''}" ${full ? 'disabled' : ''} onclick="UI.hire(${c.id})">${c.iv ? 'Hire' : 'Hire on the spot'}</button></div>`}</div>`).join('') || '<p class="mute">No applicants left today. Check back tomorrow.</p>';
+    h += '</div>';
+    const k = G.candidates.find(x => x.id === this.ivId);
+    if (k && k.iv) {
+      h += `<div class="card" style="margin-top:12px"><h3>🗣 Interview: ${esc(k.name)} <span class="mute">(${ROLES[k.role].name})</span></h3>`;
+      h += k.iv.qs.map(x => `${x.q ? `<div style="margin-top:6px"><b>You:</b> ${esc(x.q)}</div>` : ''}<div class="${x.bad ? 'bad' : ''}" style="margin-left:12px"><i>${x.q ? `${esc(k.name.split(' ')[0])}: ` : ''}${esc(x.a)}</i></div>`).join('');
+      if (!k.iv.done) h += `<p class="mute" style="margin-top:8px">Questions left: ${IV_QUESTIONS - k.iv.qs.length}. Pick what you need to know.</p><div class="row" style="flex-wrap:wrap;gap:6px">${IV_ORDER.filter(q => !k.iv.qs.some(x => x.key === q)).map(q => `<button onclick="UI.ivAsk(${k.id},'${q}')">${esc(IV_Q[q].q)}</button>`).join('')}</div>`;
+      else h += `<p class="mute" style="margin-top:8px">Interview over. What you learned is on their card.</p>`;
+      h += '</div>';
+    }
+    h += '<p class="mute">Skill sets walking and working speed (★1 ≈ 82%, ★5 ≈ 130%). Applicants ask for a wage that matches the skill their résumé claims. Keep questions about the job: never ask about age, kids or family, religion, or where someone is from.</p>';
     return h;
+  },
+  interview(id) { startInterview(id); const k = G.candidates.find(x => x.id === id); if (k && k.iv) this.ivId = id; this.render(); },
+  ivAsk(id, q) { askQuestion(id, q); this.render();
   },
   hire(id) {
     if (G.crew.length >= maxCrew()) return;
     const k = G.candidates.find(x => x.id === id);
+    if (!k || k.withdrew) return;
     G.candidates = G.candidates.filter(x => x !== k);
-    G.crew.push(ensureMorale(ensureTrain({ id: k.id, name: k.name, role: k.role, shift: k.shift, avail: k.avail || makeAvail(k.shift), skill: k.skill, wage: k.wage, calledOut: false }, k.exp != null ? k.exp : hireTrainingBase(k.skill))));
+    G.crew.push(ensureMorale(ensureTrain({ id: k.id, name: k.name, role: k.role, shift: k.shift, avail: k.trueAvail || k.avail || makeAvail(k.shift), trait: k.trait, rel: k.rel, skill: k.skill, wage: k.wage, calledOut: false }, k.exp != null ? k.exp : hireTrainingBase(k.skill))));
+    applyHire(G.crew[G.crew.length - 1], k);
     schedNewHire(G.crew[G.crew.length - 1]);
     toast(`Hired ${k.name} as ${ROLES[k.role].name} (${SHIFTS[k.shift].name}).`, 'good');
     this.render();

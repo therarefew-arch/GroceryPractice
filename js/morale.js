@@ -70,7 +70,7 @@ function moraleSpeed(c) {
   const m = ensureMorale(c).morale;
   return (m < 25 ? 0.85 : m < 45 ? 0.93 : m >= 80 ? 1.05 : 1) * (c.lead ? 1.05 : 1);
 }
-function calloutChance(c) { const m = ensureMorale(c).morale; return 0.04 + (m < 40 ? 0.08 : 0) + (m < 20 ? 0.06 : 0); }
+function calloutChance(c) { const m = ensureMorale(c).morale; return Math.max(0.01, 0.04 + (m < 40 ? 0.08 : 0) + (m < 20 ? 0.06 : 0) + (REL_CALLOUT[c.rel] || 0)); }
 function sentHomeToday(c) { return c.sentHome === G.day; }
 function leadOnShift() { return G.crew.some(c => c.lead && onShift(c)); }
 function canPromote(c) {
