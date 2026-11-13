@@ -424,17 +424,18 @@ const UI = {
   },
 
   tab_display() {
-    let h = `<h2>Display Planner</h2><p class="mute">Each endcap lifts its department's sales +12% (max 2 per department). The lift only pays if the shelf stays in stock — and tomorrow's forecast includes it.</p>`;
+    let h = `<h2>Display Planner</h2><p class="mute">Each stocked endcap lifts its department's sales +12% (max 2 per department), and some of that department's shoppers take product off it instead of the shelf. An endcap holds ${EC_CASES} cases, built from the department's backstock. Picking a display here only <b>plans</b> it: the switch happens on the floor, Tuesday from 6 PM (the ad flip) until Wednesday noon. Taking a display down (plan it Empty) can happen any day. ${ecWindow() ? '<span class="good">The switch window is open now.</span>' : '<span class="warn">Next switch window: Tuesday 6 PM.</span>'}</p>`;
     if (G.ad) h += `<div class="card" style="margin-bottom:12px"><b>📰 Ad week (since Day ${G.ad.from}):</b> District wants <b>${G.ad.depts.map(d => DEPT[d].name).join(' & ')}</b> on at least 2 endcaps each. Status: ${G.ad.depts.map(d => `<span class="${endcapCount(d) >= 2 ? 'good' : 'warn'}">${DEPT[d].name} ${endcapCount(d)}/2</span>`).join(' · ')}</div>`;
-    h += `<table><tr><th>Endcap</th><th>Display</th><th>Effect</th></tr>`;
+    h += `<table><tr><th>Endcap</th><th>On it now</th><th>Next set</th><th>Effect</th></tr>`;
     for (const e of MAPD.endcaps) {
       const gd = DEPT[SHELF_DEPT[e.gondola]], cur = G.endcaps[e.id];
-      h += `<tr><td>${gd.aisle} (${gd.name}) — ${e.end} endcap</td><td><select onchange="UI.setEndcap('${e.id}',this.value)"><option value="">— Empty —</option>${DEPTS.map(d => `<option value="${d.id}" ${cur === d.id ? 'selected' : ''}>${d.name}</option>`).join('')}</select></td>
-        <td>${cur ? `<span class="good">${DEPT[cur].name} +${Math.round((promoLift(cur) - 1) * 100)}% total</span>` : '<span class="mute">—</span>'}</td></tr>`;
+      const nx = ecPlanned(e) ? (G.ecPlan[e.id] || '') : (cur || ''), st = ecStockOf(e.id);
+      h += `<tr><td>${gd.aisle} (${gd.name}) — ${e.end} endcap</td><td>${cur ? `${DEPT[cur].name} <span class="${st <= 0 ? 'bad' : st < ecCap(cur) / 2 ? 'warn' : 'mute'}">${st}/${ecCap(cur)}</span>` : '<span class="mute">Empty</span>'}</td><td><select onchange="UI.setEndcap('${e.id}',this.value)"><option value="">— Empty —</option>${DEPTS.map(d => `<option value="${d.id}" ${nx === d.id ? 'selected' : ''}>${d.name}</option>`).join('')}</select>${ecPlanned(e) ? ` <span class="warn">change planned</span>${nx ? ` <span class="mute">(${Math.min(ecCap(nx), G.stock[nx].back)} of ${ecCap(nx)} in backstock)</span>` : ''}` : ''}</td>
+        <td>${cur && st > 0 ? `<span class="good">${DEPT[cur].name} +${Math.round((promoLift(cur) - 1) * 100)}% total</span>` : cur ? '<span class="bad">empty: no lift</span>' : '<span class="mute">—</span>'}</td></tr>`;
     }
     return h + '</table>';
   },
-  setEndcap(id, v) { G.endcaps[id] = v || null; this.render(); },
+  setEndcap(id, v) { if ((v || null) === (G.endcaps[id] || null)) delete G.ecPlan[id]; else G.ecPlan[id] = v || ''; this.render(); },
 
   tab_order() {
     const editable = orderOpen();

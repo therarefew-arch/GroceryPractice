@@ -8,7 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1380, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.21'; // bump the last number on every update
+const VERSION = '0.0.22'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -63,7 +63,8 @@ const floatById = id => G.floats.find(f => f.id === id);
 const floatOf = dept => G.floats.find(f => f.dept === dept);
 const shelfPct = dept => G.stock[dept].shelf / DEPT[dept].capU;
 const canStock = dept => !coolerBlocked(dept) && DEPT[dept].capU - G.stock[dept].shelf >= DEPT[dept].upc * 0.5;
-const endcapCount = dept => Object.values(G.endcaps).filter(v => v === dept).length;
+// only a display with product on it counts (js/endcaps.js)
+const endcapCount = dept => MAPD.endcaps.filter(e => G.endcaps[e.id] === dept && ecStockOf(e.id) > 0).length;
 const promoLift = dept => 1 + 0.12 * Math.min(2, endcapCount(dept));
 const crewName = id => (G.crew.find(c => c.id === id) || { name: 'Someone' }).name;
 const level = () => 1 + Math.floor(G.xp / XP_PER_LEVEL);
@@ -88,7 +89,7 @@ function backCase(cs) { const u = caseUnits(cs); G.stock[cs.d].back += u; if (cs
 function floatToBack(f) { f.cases.forEach(backCase); f.cases = []; }
 
 function onHandUnits(dept) {
-  let u = G.stock[dept].shelf + G.stock[dept].back;
+  let u = G.stock[dept].shelf + G.stock[dept].back + ecUnits(dept);
   const add = cont => cont.cases.forEach(c => { if (c.d === dept) u += caseUnits(c); });
   G.pallets.forEach(add); G.trailer.forEach(add); G.floats.forEach(add);
   return u;
@@ -117,7 +118,7 @@ function suggestedCases(dept, td) {
   // what will still sell between now and the truck night
   let before = 0;
   for (let k = G.day; k <= td; k++) before += forecastFor(dept, k) * (k === G.day ? (G.phase === 'day' ? trafficRemaining(G.time) : 0) : 1);
-  need += forecastFor(dept, td + 1) * 0.25 - (sysOnHand(dept) - before) - dsdUnits(dept) * 0.8 * cover;
+  need += forecastFor(dept, td + 1) * 0.25 - (sysOnHand(dept) - before) - dsdUnits(dept) * 0.8 * cover + ecOrderNeed(dept);
   return Math.max(0, Math.ceil(need / d.upc));
 }
 function suggestedOrder() { const o = {}; DEPTS.forEach(d => { o[d.id] = suggestedCases(d.id); }); return o; }
@@ -215,6 +216,7 @@ function newGame() {
   MAPD.endcaps.forEach(e => { G.endcaps[e.id] = null; });
   G.endcaps[MAPD.endcaps[3].id] = 'A2';
   G.endcaps[MAPD.endcaps[5].id] = 'A3';
+  ensureEndcaps();
   G.crew.push({ id: nid(), name: 'Maria L.', role: 'breakdown', shift: 'open', skill: 3, wage: 16.25, calledOut: false });
   G.crew.push({ id: nid(), name: 'Devon P.', role: 'freight', shift: 'truck6', skill: 3, wage: 16.25, calledOut: false });
   G.crew.forEach(c => ensureMorale(ensureTrain(c, 40)));
@@ -277,7 +279,7 @@ function startDay() {
   if (dowNow === 'Mon') {
     G.nextAd = shuffle(DEPTS.map(d => d.id)).slice(0, 2);
     mail('District Manager', `Next ad chart: ${G.nextAd.map(d => DEPT[d].name).join(' & ')}`,
-      `The new ad starts Wednesday. Plan your spots today, flip the endcaps Tuesday night (2 each for ${G.nextAd.map(d => DEPT[d].name).join(' and ')}), and verify it Wednesday morning.\nEndcaps lift sales, but only if the shelves behind them stay full.`);
+      `The new ad starts Wednesday. Plan the new set today in the Display Planner (2 endcaps each for ${G.nextAd.map(d => DEPT[d].name).join(' and ')}), and order extra on tonight's truck: each endcap holds ${EC_CASES} cases, built from backstock. The closing crew flips the endcaps Tuesday from 6 PM; verify it Wednesday morning.\nEndcaps lift sales, but only while there's product on them and the shelves behind them stay full.`);
   }
   if (dowNow === 'Wed' && G.nextAd) {
     G.ad = { depts: G.nextAd, from: G.day }; G.nextAd = null;
@@ -289,6 +291,7 @@ function startDay() {
   cutsStartDay();
   recallsStartDay();
   resetsStartDay();
+  endcapsStartDay();
   G.list = buildChecklist();
   shiftStartDay();
   const nt = nextTruckDay(G.day);
@@ -322,9 +325,9 @@ function endDay() {
   RT.vendorNpcs = {}; RT.customers = [];
   G.crew.forEach(despawnCrew);
   tenureDay();
-  countsEndDay(); damagesEndDay(); cutsEndDay(); recallsEndDay(); resetsEndDay();
+  countsEndDay(); damagesEndDay(); cutsEndDay(); recallsEndDay(); resetsEndDay(); endcapsEndDay();
   const res = computeResults();
-  res.tips.push(...moraleDay(res), ...eventsTips(), ...backroomTips(), ...facingTips(), ...countsTips(), ...damagesTips(), ...cutsTips(), ...recallsTips(), ...resetsTips());
+  res.tips.push(...moraleDay(res), ...eventsTips(), ...backroomTips(), ...facingTips(), ...countsTips(), ...damagesTips(), ...cutsTips(), ...recallsTips(), ...resetsTips(), ...endcapsTips());
   DEPTS.forEach(d => {
     G.history[d.id].push(t.demand[d.id] || 0);
     if (G.history[d.id].length > 14) G.history[d.id].shift();
@@ -333,7 +336,7 @@ function endDay() {
   res.badges.forEach(b => { G.badges[b] = (G.badges[b] || 0) + 1; });
   G.bank += res.bonus;
   addXP(res.xp);
-  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res), ...laborDayExtras(), ...backroomDayExtras(), ...facingDayExtras(), ...countsDayExtras(), ...damagesDayExtras(), ...cutsDayExtras(), ...recallsDayExtras(), ...resetsDayExtras() });
+  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res), ...laborDayExtras(), ...backroomDayExtras(), ...facingDayExtras(), ...countsDayExtras(), ...damagesDayExtras(), ...cutsDayExtras(), ...recallsDayExtras(), ...resetsDayExtras(), ...endcapsDayExtras() });
   if (G.pastDays.length > 30) G.pastDays.shift();
   updateRecords(G.pastDays[G.pastDays.length - 1]);
   if (dowOf(G.day) === 'Fri') {
@@ -500,7 +503,7 @@ function orderWindowTick(prev) {
 
 function onHour(h) {
   if (h >= 9 && h <= 21) spoilCheck();
-  mentorHour(); trashHour(); moraleHour(); eventsHour(h); backroomHour(); facingHour(h); damagesHour(); recallsHour(h); resetsHour(h);
+  mentorHour(); trashHour(); moraleHour(); eventsHour(h); backroomHour(); facingHour(h); damagesHour(); recallsHour(h); resetsHour(h); endcapsHour(h);
   if (h === 13 && G.sat < 55) mail('Customer Service Desk', 'Complaints are piling up', 'We\'re getting a lot of complaints about empty shelves and wrong prices today. Can someone check the floor?');
   if (h === 16) toast('🛒 Rush hour is coming (4–7 PM). Top off the fast movers now!', 'warn');
   if (h % 2 === 0) save();
@@ -582,7 +585,8 @@ function buy(cu, dept) {
   t.demand[dept] = (t.demand[dept] || 0) + q;
   const it = wpick(d.items, i => i[1])[0];
   t.itemDemand[it] = (t.itemDemand[it] || 0) + q;
-  if (s.shelf - codeExp(dept) <= 0) {
+  const fromEc = ecHas(dept) && (s.shelf - codeExp(dept) <= 0 || Math.random() < EC_SHARE);
+  if (!fromEc && s.shelf - codeExp(dept) <= 0) {
     t.misses++;
     countsOnOut(dept);
     t.lost[dept] = (t.lost[dept] || 0) + q;
@@ -596,10 +600,10 @@ function buy(cu, dept) {
   }
   if (recallBlock(dept, it, cu)) return;
   if (outHole(dept, it, cu, q)) return;
-  if (visualOut(dept, cu, q)) return;
-  const got = Math.min(q, s.shelf - codeExp(dept));
-  s.shelf -= got;
-  t.sales += got * d.price - codesSold(dept, got, cu);
+  if (!fromEc && visualOut(dept, cu, q)) return;
+  const got = fromEc ? ecTake(dept, q) : Math.min(q, s.shelf - codeExp(dept));
+  if (!fromEc) s.shelf -= got;
+  t.sales += got * d.price - (fromEc ? 0 : codesSold(dept, got, cu));
   t.units[dept] = (t.units[dept] || 0) + got;
   G.sat = Math.min(100, G.sat + 0.06);
   shopMess(dept, got, cu);
@@ -944,13 +948,13 @@ function brain(c, r) {
   switch (c.role) {
     case 'breakdown': return (backroomUrgent() ? planBackroom(c, r) : null) || planBreakdown(c, r) || planDamages(c, r) || planBackroom(c, r) || planFreight(c, r, null, 30) || planReplen(c, r, null, 0.5);
     case 'freight': return planFreight(c, r, null, 20) || planBirdRunToday(c, r) || planReplen(c, r, null, 0.6) || planBreakdown(c, r);
-    case 'replen': return planBirdRunToday(c, r) || planReplen(c, r, null, 0.75) || planFreight(c, r, null, 25);
+    case 'replen': return planEndcapSwitch(c, r) || planBirdRunToday(c, r) || planEndcapFill(c, r) || planReplen(c, r, null, 0.75) || planFreight(c, r, null, 25);
     case 'dsd': return planDSD(c, r) || planReplen(c, r, null, 0.6);
     case 'price': return planRecall(c, r) || planPrice(c, r) || planOutTag(c, r) || planCount(c, r) || planReclaim(c, r) || planReplen(c, r, null, 0.5);
     case 'unloader': return planUnload(c, r) || (backroomUrgent() ? planBackroom(c, r) : null) || planBreakdown(c, r) || planDamages(c, r) || planBackroom(c, r) || planFreight(c, r, null, 20);
     default: {
       const D = [role.dept];
-      return planRecall(c, r, D) || (G.time >= 300 ? planReset(c, r, D) : null) || planReplen(c, r, D, 0.85) || planFreight(c, r, D, 6) || planBreakdown(c, r, D) || planCount(c, r, D) ||
+      return planRecall(c, r, D) || (G.time >= 300 ? planReset(c, r, D) : null) || (G.time >= 1080 ? planEndcapSwitch(c, r) : null) || planReplen(c, r, D, 0.85) || planFreight(c, r, D, 6) || planBreakdown(c, r, D) || planCount(c, r, D) ||
         (backCases(role.dept) >= 3 && shelfPct(role.dept) < 0.95 ? planBirdRun(c, r, role.dept) : null) || planFace(c, r, role.dept);
     }
   }
@@ -1145,6 +1149,8 @@ function getInteraction() {
   const tag = nearest(G.tags.filter(tagReady).map(t => ({ x: t.x + 0.5, y: t.y + 0.5, t })), p, 1.5);
   const rci = !p.work && recallInteraction(p, shelfDept, shelf, bird, pal, fl);
   if (rci) return rci;
+  const eci = !p.work && !pushing && endcapInteraction(p);
+  if (eci) return eci;
   const oti = !p.work && outTagInteraction(p);
   if (tag) {
     const t = tag.t, pt = { label: t.kind === 'error' ? 'Fix scan error (shelf price ≠ register)' : 'Hang price change tag', fn: () => startWork(1.5, t.kind === 'error' ? 'Fixing scan error' : 'Hanging tag', () => { if (G.tags.includes(t)) fixTag(t, true); }), at: tag };
@@ -1309,6 +1315,7 @@ function load() {
     ensureCuts();
     ensureRecalls();
     ensureResets();
+    ensureEndcaps();
     if (G.phase === 'day' && (!G.counts || G.counts.day !== G.day)) countsStartDay();
     if (!G.list && G.phase === 'day') G.list = buildChecklist();
     RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {}; RT.faceClaim = {}; RT.gobackClaim = null; RT.countClaim = {}; RT.dmgClaim = null; RT.reclaimClaim = null; RT.outTagClaim = {}; RT.holeWarned = {}; RT.recallClaim = {}; RT.recallWarned = {}; RT.resetWorkers = {};

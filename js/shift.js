@@ -164,6 +164,7 @@ function helpPlan(c, r) {
   if (G.phase !== 'day') return null;
   return (recallUrgent() ? planRecall(c, r) : null) ||
     (resetToday() ? planReset(c, r) : null) ||
+    planEndcapSwitch(c, r) ||
     (!priceOnShift() ? planPrice(c, r) || planOutTag(c, r) : null) ||
     (gobacksUrgent() ? planGobacks(c, r) : null) ||
     (salesFloorDamages().length ? planDamages(c, r) : null) ||
@@ -171,6 +172,7 @@ function helpPlan(c, r) {
     planReturnBird(c, r) ||
     planBirdRunToday(c, r) ||
     planReplen(c, r, null, 0.9) ||
+    planEndcapFill(c, r) ||
     (sweepDue() && G.dirt >= 5 && !RT.sweepClaim ? planSweep(c, r) : null) ||
     planDamages(c, r) ||
     (G.time >= OPEN ? planFaceMessiest(c, r, 90) || planGobacks(c, r) : null);

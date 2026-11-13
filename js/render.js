@@ -299,9 +299,12 @@ function drawEndcaps() {
     const dept = G.endcaps[e.id], px = e.x * T, py = e.y * T;
     housing(ctx, px + 1, py + 3, T - 2, T - 6);
     ctx.fillStyle = '#151a20'; ctx.fillRect(px + 4, py + 6, T - 8, T - 12);
-    if (dept) {
+    if (dept && ecStockOf(e.id) > 0) {
       glowRect(ctx, px + 5, py + 7, T - 10, T - 14, DEPT[dept].color, 10);
       label(ctx, '★', px + T / 2, py + T / 2 + 1, { font: 'bold 12px system-ui', color: '#fff8d6' });
+    } else if (dept) {
+      ctx.globalAlpha = 0.3; ctx.fillStyle = DEPT[dept].color; ctx.fillRect(px + 5, py + 7, T - 10, T - 14); ctx.globalAlpha = 1;
+      label(ctx, 'EMPTY', px + T / 2, py + T / 2 + 1, { font: PX(7), color: '#ffb3ad' });
     }
   }
 }
@@ -514,6 +517,7 @@ function render() {
   drawDamages();
   drawCountMarks();
   drawRecallMarks();
+  drawEndcapExtras();
   drawResetMarks();
   RT.customers.forEach(drawCustomer);
   Object.values(RT.vendorNpcs).forEach(drawVendor);

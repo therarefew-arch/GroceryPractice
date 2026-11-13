@@ -98,8 +98,8 @@ function postCount(k, crew) {
   t.countsDone = (t.countsDone || 0) + 1;
   if (variance < 0) t.countShrink = (t.countShrink || 0) + -variance * d.price * 0.6;
   const v = `${variance > 0 ? '+' : ''}${variance} units, ${variance < 0 ? '-' : '+'}${money(Math.abs(variance) * d.price * 0.6)}`;
-  const freight = Math.max(0, counted - (k.shelf || 0) - (k.back || 0));
-  const what = `${k.shelf} on the shelf + ${k.back} in backstock${freight ? ` + ${freight} still in freight` : ''} = ${counted}`;
+  const rest = Math.max(0, counted - (k.shelf || 0) - (k.back || 0)), onEc = Math.min(rest, ecUnits(dept)), freight = rest - onEc;
+  const what = `${k.shelf} on the shelf + ${k.back} in backstock${onEc ? ` + ${onEc} on endcaps` : ''}${freight ? ` + ${freight} still in freight` : ''} = ${counted}`;
   if (crew) toast(`🔢 ${crew.name.split(' ')[0]} counted ${d.aisle}: system ${sys}, real ${counted} (${v}).`, 'info');
   else {
     addXP(8, G.player);

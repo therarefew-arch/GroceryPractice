@@ -31,6 +31,7 @@ const TASK_CHECK = {
   outtags: () => !outTagJobs().length,
   reset: a => { const rs = resetById(a.id); return !rs || rs.state === 'done'; },
   resetprep: () => true,
+  ecfill: () => MAPD.endcaps.every(e => !G.endcaps[e.id] || (ecStockOf(e.id) > 0 && !ecLow(e))),
   recallshelf: a => { const rs = recallById(a.id); return !rs || rs.shelfAt != null; },
   recallall: a => { const rs = recallById(a.id); return !rs || (rs.shelfAt != null && rs.backAt != null && !recallFreight(rs).length); },
   recallcert: a => { const rs = recallById(a.id); return !rs || rs.state !== 'open'; },
@@ -75,7 +76,8 @@ function buildChecklist() {
   if (dow === 'Mon') add('forecast', 'forecast', 'Forecast next week', `Office computer → Labor. Window closes ${fmtTime(FORECAST_CUTOFF)}`, FORECAST_CUTOFF, 'by');
   if (dow === 'Thu') add('schedule', 'schedule', 'Post next week\'s schedule', 'Check it against labor demand first (Schedule + Labor tabs)', SCHED_CUTOFF, 'by');
   if (dow === 'Mon' && G.nextAd) add('adplan', 'adflip', 'Plan spots for tomorrow\'s ad chart', `New ad: ${G.nextAd.map(d => DEPT[d].name).join(' & ')}`, 1375, 'at');
-  if (dow === 'Tue' && G.nextAd) add('adflip', 'adflip', 'Ad flip tonight', `Set 2 endcaps each for ${G.nextAd.map(d => DEPT[d].name).join(' & ')} before close`, 1375, 'at');
+  if (dow === 'Tue' && G.nextAd) add('adflip', 'adflip', 'Ad flip tonight', `Switch 2 endcaps each to ${G.nextAd.map(d => DEPT[d].name).join(' & ')} (from 6 PM, E at the endcap)`, 1375, 'at');
+  if (MAPD.endcaps.some(e => G.endcaps[e.id])) add('ecfill', 'ecfill', 'Endcaps full', 'Every endcap display at least half full', 1020, 'at');
   if (dow === 'Wed' && G.ad) add('adverify', 'adverify', 'Verify the new ad', 'Ad endcaps up and those shelves 60%+ by noon', 720, 'at');
   if (['Fri', 'Sat', 'Sun'].includes(dow)) BLITZ_TIMES.forEach(t => add('blitz-' + t, 'blitz', `Blitz ${fmtTime(t)}`, 'Every department 40%+', t, 'at'));
   add('face5', 'faced', 'Recovery at 5 PM: face every aisle', 'Every aisle 85%+ faced between 5 and 6 PM, before the dinner rush', 1080, 'by', { pct: FACE_GOOD, from: 1020 });
