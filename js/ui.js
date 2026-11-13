@@ -189,6 +189,7 @@ const UI = {
     let h = `<h2>Today's list · ${WEEKDAY_NAMES[dowIdx(G.day)]}</h2><p class="mute">${p.done} of ${p.total} done. Tasks check themselves off when the work is done. +${TASK_XP} XP each, +${LIST_BONUS_XP} XP for the whole list.</p><table>`;
     h += L.map(t => `<tr><td style="width:28px">${t.status === 'done' ? '<span class="good">✓</span>' : t.status === 'missed' ? '<span class="bad">✗</span>' : '○'}</td><td><b class="${t.status === 'missed' ? 'bad' : ''}">${esc(t.label)}</b><div class="mute">${esc(t.sub)}</div></td><td class="n mute">${t.mode === 'by' ? 'by' : 'at'} ${fmtTime(t.due)}</td></tr>`).join('');
     h += '</table>';
+    h += weatherStripHTML(false);
     h += recallTodayHTML();
     h += resetTodayHTML();
     { const toScan = binToScan(), claim = toScan.filter(d => d.src === 'truck' && d.day === G.day).length, t = G.today;
@@ -465,7 +466,7 @@ const UI = {
     const td = nextTruckDay(G.phase === 'day' ? G.day : G.day + 1), cover = coverDays(td);
     const sug = suggestedOrder();
     const cur = (G.order && G.day === td) ? G.order : sug;
-    let h = `<h2>Forecast & Order</h2>` + seasonBanner();
+    let h = `<h2>Forecast & Order</h2>` + weatherStripHTML(true) + seasonBanner();
     h += `<p class="mute">Tonight's trucks: <b>${trucksOn(td).map(t => TRUCK_TYPES[t].name).join(', ')}</b>. Only departments on tonight's trucks can be ordered. The window closes at <b>${fmtTime(ORDER_CUTOFF)}</b>.</p>`;
     if (editable) h += `<p>Order for <b>tonight's trucks</b> (${WEEKDAY_NAMES[dowIdx(td)]}). Each department's order has to cover the days until its next truck (see Covers). ${G.orderSubmitted ? '<span class="good">✓ Submitted. You can still change and resubmit until the cutoff.</span>' : `<span class="warn">Not submitted yet. Due by ${fmtTime(ORDER_CUTOFF)}.</span>`}</p>`;
     else if (G.phase === 'day' && isTruckNight(G.day)) h += `<p class="warn">The order window closed at ${fmtTime(ORDER_CUTOFF)}. ${G.today.systemOrder ? 'The system order was sent.' : 'Your order is locked in.'}</p>`;

@@ -509,7 +509,7 @@ function render() {
   ctx.fillStyle = PAL.void; ctx.fillRect(0, 0, canvas.width, canvas.height);
   applyCamera();
   ctx.drawImage(BG, 0, 0);
-  drawShelves(); drawFaceBars(); drawEndcaps(); drawTags(); drawOutTags(); drawTrash(); drawEvents(); drawBackroom(); drawReclaim();
+  drawShelves(); drawFaceBars(); drawEndcaps(); drawTags(); drawOutTags(); drawTrash(); drawWeatherDoor(); drawEvents(); drawBackroom(); drawReclaim();
   if (G.phase === 'night') drawTrailer();
   G.pallets.forEach(p => drawPallet(p));
   G.floats.forEach(drawFloatMaybeCrooked);

@@ -8,7 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1380, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.27'; // bump the last number on every update
+const VERSION = '0.0.28'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -277,6 +277,7 @@ function startDay() {
     if (c.calledOut) mail(c.name, 'Can\'t make it in today', `Hey, I'm sick and can't make my ${SHIFTS[curShift(c)].name} shift today. Sorry!\n— ${c.name}`);
   });
   timeoffCallouts();
+  weatherStartDay();
   const dowNow = dowOf(G.day);
   if (!G.ad && G.day === 1) G.ad = { depts: shuffle(DEPTS.map(d => d.id)).slice(0, 2), from: 1 };
   if (dowNow === 'Mon') {
@@ -330,7 +331,7 @@ function endDay() {
   tenureDay();
   countsEndDay(); damagesEndDay(); cutsEndDay(); recallsEndDay(); resetsEndDay(); endcapsEndDay(); perfEndDay();
   const res = computeResults();
-  res.tips.push(...moraleDay(res), ...eventsTips(), ...backroomTips(), ...facingTips(), ...countsTips(), ...damagesTips(), ...cutsTips(), ...recallsTips(), ...resetsTips(), ...endcapsTips(), ...timeoffTips(), ...interviewTips(), ...huddleTips(), ...perfTips(), ...custTips());
+  res.tips.push(...moraleDay(res), ...eventsTips(), ...backroomTips(), ...facingTips(), ...countsTips(), ...damagesTips(), ...cutsTips(), ...recallsTips(), ...resetsTips(), ...endcapsTips(), ...timeoffTips(), ...interviewTips(), ...huddleTips(), ...perfTips(), ...custTips(), ...weatherTips());
   DEPTS.forEach(d => {
     G.history[d.id].push(t.demand[d.id] || 0);
     if (G.history[d.id].length > 14) G.history[d.id].shift();
@@ -339,7 +340,7 @@ function endDay() {
   res.badges.forEach(b => { G.badges[b] = (G.badges[b] || 0) + 1; });
   G.bank += res.bonus;
   addXP(res.xp);
-  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res), ...laborDayExtras(), ...backroomDayExtras(), ...facingDayExtras(), ...countsDayExtras(), ...damagesDayExtras(), ...cutsDayExtras(), ...recallsDayExtras(), ...resetsDayExtras(), ...endcapsDayExtras(), ...timeoffDayExtras(), ...interviewDayExtras(), ...huddleDayExtras(), ...perfDayExtras(), ...custDayExtras() });
+  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res), ...laborDayExtras(), ...backroomDayExtras(), ...facingDayExtras(), ...countsDayExtras(), ...damagesDayExtras(), ...cutsDayExtras(), ...recallsDayExtras(), ...resetsDayExtras(), ...endcapsDayExtras(), ...timeoffDayExtras(), ...interviewDayExtras(), ...huddleDayExtras(), ...perfDayExtras(), ...custDayExtras(), ...weatherDayExtras() });
   if (G.pastDays.length > 30) G.pastDays.shift();
   updateRecords(G.pastDays[G.pastDays.length - 1]);
   if (dowOf(G.day) === 'Fri') {
@@ -506,7 +507,7 @@ function orderWindowTick(prev) {
 
 function onHour(h) {
   if (h >= 9 && h <= 21) spoilCheck();
-  mentorHour(); trashHour(); moraleHour(); eventsHour(h); backroomHour(); facingHour(h); damagesHour(); recallsHour(h); resetsHour(h); endcapsHour(h); timeoffHour(); custHour(h);
+  mentorHour(); trashHour(); moraleHour(); eventsHour(h); backroomHour(); facingHour(h); damagesHour(); recallsHour(h); resetsHour(h); endcapsHour(h); timeoffHour(); custHour(h); weatherHour(h);
   if (h === 13 && G.sat < 55) mail('Customer Service Desk', 'Complaints are piling up', 'We\'re getting a lot of complaints about empty shelves and wrong prices today. Can someone check the floor?');
   if (h === 16) toast('🛒 Rush hour is coming (4–7 PM). Top off the fast movers now!', 'warn');
   if (h % 2 === 0) save();
@@ -536,14 +537,14 @@ function spawnCustomers(gm) {
   if (G.time < OPEN || G.time > CLOSE - 20) return;
   const w = TRAFFIC[Math.floor(G.time / 60)] || 0;
   const satMult = clamp(0.7 + 0.3 * G.sat / 80, 0.7, 1.08);
-  RT.custAcc += CUST_PER_DAY * dowFactor(G.day) * satMult * w / TRAFFIC_SUM / 60 * gm;
+  RT.custAcc += CUST_PER_DAY * dowFactor(G.day) * wxTraffic(G.day) * satMult * w / TRAFFIC_SUM / 60 * gm;
   while (RT.custAcc >= 1) { RT.custAcc -= 1; spawnCustomer(); }
 }
 
 function spawnCustomer() {
   const n = randi(2, 4), stops = [], pool = DEPTS.slice();
   for (let i = 0; i < n && pool.length; i++) {
-    const d = wpick(pool, x => x.demand * x.upc * promoLift(x.id) * catalogFactor(x.id) * seasonLift(x.id, G.day));
+    const d = wpick(pool, x => x.demand * x.upc * promoLift(x.id) * catalogFactor(x.id) * seasonLift(x.id, G.day) * wxLift(x.id, G.day));
     stops.push(d.id); pool.splice(pool.indexOf(d), 1);
   }
   const door = pick(MAPD.frontDoor);
@@ -583,7 +584,7 @@ function updateCustomers(dt) {
 function buy(cu, dept) {
   const d = DEPT[dept], s = G.stock[dept], t = G.today;
   let q = randi(1, 3) + (endcapCount(dept) && Math.random() < 0.3 ? 1 : 0);
-  const sl = seasonLift(dept, G.day);
+  const sl = seasonLift(dept, G.day) * wxLift(dept, G.day);
   if (sl > 1 && Math.random() < Math.min(1, (sl - 1) * 1.6)) q++;
   t.requests++;
   t.demand[dept] = (t.demand[dept] || 0) + q;
@@ -1155,6 +1156,8 @@ function getInteraction() {
   if (rci) return rci;
   const cri = !p.work && !pushing && custInteraction(p);
   if (cri) return cri;
+  const mti = !p.work && !pushing && matInteraction(p);
+  if (mti) return mti;
   const eci = !p.work && !pushing && endcapInteraction(p);
   if (eci) return eci;
   const hdi = !p.work && !pushing && huddleInteraction(p);
