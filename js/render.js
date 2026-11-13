@@ -518,6 +518,7 @@ function render() {
   drawCountMarks();
   drawRecallMarks();
   drawEndcapExtras();
+  drawHuddleMark();
   drawResetMarks();
   RT.customers.forEach(drawCustomer);
   Object.values(RT.vendorNpcs).forEach(drawVendor);

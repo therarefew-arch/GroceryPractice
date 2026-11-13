@@ -611,6 +611,7 @@ const UI = {
     this._askYes = onYes;
     this.showModal(`<h2>${esc(title)}</h2><p>${esc(body)}</p><div class="row" style="justify-content:flex-end;margin-top:12px"><button onclick="UI.hideModal()">${esc(no || 'Cancel')}</button><button class="${danger ? 'danger' : 'primary'}" onclick="UI.hideModal(); const f = UI._askYes; UI._askYes = null; if (f) f();">${esc(yes)}</button></div>`);
   },
+  huddle() { this.showModal(huddleSheetHTML()); },
   newGameConfirm() {
     this.ask('Start a brand-new store?', 'Your saved progress will be erased. This can\'t be undone.', 'Start over', () => this.newGameNow(), true);
   },

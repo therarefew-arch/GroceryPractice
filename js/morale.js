@@ -43,6 +43,7 @@ const LIKE_TEXT = {
   promoted: 'You gave me a shot as a lead. I won\'t forget that.',
   fair: 'You handled the drama fairly.',
   heard: 'When I needed a day off, you made it work.',
+  direction: 'Every morning I knew what mattered that day.',
 };
 
 function ensureMorale(c) {
