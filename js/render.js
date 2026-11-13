@@ -524,6 +524,7 @@ function render() {
   RT.customers.forEach(drawCustomer);
   Object.values(RT.vendorNpcs).forEach(drawVendor);
   drawRep();
+  drawDm();
   G.crew.forEach(c => { const r = RT.crew[c.id]; if (r && r.inBuilding) drawCrew(c, r); });
   if (!G.player.away) { drawTarget(); drawPlayer(); drawHeldGobacks(G.player); drawHeldDamages(G.player); }
   RT.floaters.forEach(f => {

@@ -34,6 +34,8 @@ const TASK_CHECK = {
   pto: () => !ptoPending().length,
   reviews: () => !reviewsDue().length,
   huddle: () => huddleHeld(),
+  dmwalk: a => { const w = ((G.dm && G.dm.walks) || []).find(x => x.id === a.id); return !w || ((w.state === 'walking' || w.state === 'done') && !!w.with); },
+  dmfix: a => !dmCheck(a.key).see(),
   rep: a => { const v = (G.repVisits || []).find(x => x.id === a.id); return !v || v.state === 'met'; },
   ecfill: () => MAPD.endcaps.every(e => !G.endcaps[e.id] || (ecStockOf(e.id) > 0 && !ecLow(e))),
   recallshelf: a => { const rs = recallById(a.id); return !rs || rs.shelfAt != null; },
@@ -73,6 +75,7 @@ function buildChecklist() {
   const trucks = lastNightTrucks();
   if (countsToday().length) add('counts', 'counts', `Cycle counts: ${countsToday().map(k => DEPT[k.dept].aisle).join(', ')}`, 'Count each shelf (E) and its backstock bird (E) so the system on-hand is right before you order', 1260, 'by');
   recallTasks(add);
+  dmTasks(add);
   resetTasks(add);
   add('invoices', 'invoices', `Invoices closed: ${trucks.join(', ')} + DSD`, 'Office computer → Today. A truck closes once its freight is worked: claim any shorts first', 1370, 'by');
   { const n = holes().filter(o => !o.tagged).length, pl = (G.whOuts || []).filter(o => o.state === 'pull').length;

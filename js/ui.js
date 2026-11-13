@@ -616,6 +616,7 @@ const UI = {
     this.showModal(`<h2>${esc(title)}</h2><p>${esc(body)}</p><div class="row" style="justify-content:flex-end;margin-top:12px"><button onclick="UI.hideModal()">${esc(no || 'Cancel')}</button><button class="${danger ? 'danger' : 'primary'}" onclick="UI.hideModal(); const f = UI._askYes; UI._askYes = null; if (f) f();">${esc(yes)}</button></div>`);
   },
   huddle() { this.showModal(huddleSheetHTML()); },
+  dmWalk() { const w = dmWalk(true); if (w) this.showModal(dmResultHTML(w)); else this.hideModal(); },
   repMeet() { const h = repPitchHTML(); if (h) this.showModal(h); },
   repPick(key) {
     const r = repAnswer(key);
