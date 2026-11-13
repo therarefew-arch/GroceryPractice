@@ -70,6 +70,7 @@ const UI = {
     if (p.carry.length) hold = 'Holding: ' + p.carry.map(caseLabel).join(' · ');
     else if (p.floatId) { const f = floatById(p.floatId); if (f) hold = `Pushing ${DEPT[f.dept].aisle} ${DEPT[f.dept].name} float · ${plural(f.cases.length, 'case')}`; }
     else if (p.pallet) hold = `Pallet jack: ${plural(p.pallet.cases.length, 'case')}${p.pallet.cold ? ' (cold)' : ''}`;
+    if (p.damages && p.damages.length) hold += (hold ? ' · ' : '') + `Damages for reclaim: ${p.damages.length}`;
     if (p.gobacks && p.gobacks.length) hold += (hold ? ' · ' : '') + `Go-backs: ${gbSummary(p.gobacks)}`;
     $('holding').textContent = hold;
     touchFrame();
@@ -187,7 +188,10 @@ const UI = {
     const L = G.list || [], p = listProgress();
     let h = `<h2>Today's list · ${WEEKDAY_NAMES[dowIdx(G.day)]}</h2><p class="mute">${p.done} of ${p.total} done. Tasks check themselves off when the work is done. +${TASK_XP} XP each, +${LIST_BONUS_XP} XP for the whole list.</p><table>`;
     h += L.map(t => `<tr><td style="width:28px">${t.status === 'done' ? '<span class="good">✓</span>' : t.status === 'missed' ? '<span class="bad">✗</span>' : '○'}</td><td><b class="${t.status === 'missed' ? 'bad' : ''}">${esc(t.label)}</b><div class="mute">${esc(t.sub)}</div></td><td class="n mute">${t.mode === 'by' ? 'by' : 'at'} ${fmtTime(t.due)}</td></tr>`).join('');
-    h += '</table><h3>Invoices (last night\'s trucks)</h3><div class="row">';
+    h += '</table>';
+    { const toScan = binToScan(), claim = toScan.filter(d => d.src === 'truck' && d.day === G.day).length, t = G.today;
+      h += `<h3>Reclaim</h3><p>${floorDamages().length ? `<span class="warn">${plural(floorDamages().length, 'damaged item')} on the floor.</span> ` : ''}Bin: <b>${toScan.length}</b> to scan${claim ? ` (<span class="good">${claim} truck damage claim${claim === 1 ? '' : 's'}: scan today for full credit</span>)` : ''}, ${binHeld().length} held for DSD vendors. Credits today: <b>${money(t.credits || 0)}</b>, written off ${money(t.dmgLoss || 0)}.</p><p class="mute">The reclaim bin is in the backroom by the office door. Today's truck damage scanned today is a claim (full cost back); other dry damages get 50% reclaim credit; cold damages are thrown away; DSD vendors credit their own damages in full at check-in if they're in the bin.</p>`; }
+    h += '<h3>Invoices (last night\'s trucks)</h3><div class="row">';
     const closed = G.today.invoicesClosed || [];
     for (const ty of lastNightTrucks()) {
       const ok = truckWorked(ty), done = closed.includes(ty);

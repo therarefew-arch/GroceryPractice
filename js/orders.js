@@ -14,12 +14,12 @@ GRIPE_TEXT.micro = 'I got pulled off my work every five minutes. I never got to 
 
 // What each job normally does (orders outside this list are "out of class").
 const ROLE_KINDS = {
-  breakdown: ['truck', 'breakdown', 'freight', 'backroom', 'trash'],
+  breakdown: ['truck', 'breakdown', 'freight', 'backroom', 'reclaim', 'trash'],
   freight: ['truck', 'freight', 'fill', 'bird', 'trash'],
   replen: ['fill', 'bird', 'face', 'gobacks', 'trash'],
   dsd: ['dsd', 'fill'],
-  price: ['price', 'count', 'fill'],
-  unloader: ['unload', 'truck', 'breakdown', 'backroom'],
+  price: ['price', 'count', 'reclaim', 'fill'],
+  unloader: ['unload', 'truck', 'breakdown', 'backroom', 'reclaim'],
 };
 const ORDERS = {
   truck: { name: 'Work the truck', desc: 'Break down pallets and push floats, whatever is next' },
@@ -29,6 +29,7 @@ const ORDERS = {
   fill: { name: 'Fill holes', dept: true, desc: 'Fill the shelf from backstock, then from that department\'s freight' },
   bird: { name: 'Run the bird', dept: true, desc: 'Push this aisle\'s backstock bird out, work it onto the shelf, bring it back' },
   face: { name: 'Face the aisle', dept: true, desc: 'Pull product forward so the shelf looks full' },
+  reclaim: { name: 'Work reclaim', desc: 'Take damaged product to the reclaim bin and scan it out' },
   count: { name: 'Cycle count', dept: true, desc: 'Count the shelf and the backstock so the system on-hand is right' },
   gobacks: { name: 'Work go-backs', desc: 'Clear the go-back cart and any strays, cold first, back to their own shelves' },
   dsd: { name: 'Watch the back door', desc: 'Check in DSD vendors as they arrive' },
@@ -77,6 +78,7 @@ function orderPlan(c, r) {
     case 'face': p = planFace(c, r, o.dept); break;
     case 'bird': p = planBirdRun(c, r, o.dept); break;
     case 'gobacks': p = planGobacks(c, r); break;
+    case 'reclaim': p = planDamages(c, r) || planReclaim(c, r); break;
     case 'count': if (!o.started) { countAdd(o.dept); o.started = true; } p = planCount(c, r, [o.dept]); break;
     case 'price': p = planPrice(c, r); break;
     case 'trash': p = planTrash(c, r); break;
@@ -144,7 +146,7 @@ function showOrders(c) {
   h += deptRow('bird', d => `${backCases(d)} cs`);
   h += deptRow('face', d => `${Math.round(faceOf(d))}%`);
   h += deptRow('count', d => { const k = countOpen(d), n = daysSinceCount(d); return k ? 'on list' : n == null ? 'never' : n + 'd ago'; });
-  h += `<div style="margin:6px 0"><b>Other</b><div>${btn('dsd', null, waiting ? `${waiting} waiting` : '')}${btn('gobacks', null, `${(G.gobacks || []).length}`)}${btn('price', null, `${G.tags.length} tags`)}${btn('trash', null, `${trashN}`)}${btn('backroom', null, `dirt ${Math.round(G.dirt || 0)}%`)}</div></div>`;
+  h += `<div style="margin:6px 0"><b>Other</b><div>${btn('dsd', null, waiting ? `${waiting} waiting` : '')}${btn('gobacks', null, `${(G.gobacks || []).length}`)}${btn('reclaim', null, `${floorDamages().length + binToScan().length}`)}${btn('price', null, `${G.tags.length} tags`)}${btn('trash', null, `${trashN}`)}${btn('backroom', null, `dirt ${Math.round(G.dirt || 0)}%`)}</div></div>`;
   h += `<div class="row" style="justify-content:flex-end;margin-top:10px"><button class="primary" onclick="UI.hideModal()">Done</button></div>`;
   UI.showModal(h);
 }

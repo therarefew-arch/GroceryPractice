@@ -505,17 +505,18 @@ function render() {
   ctx.fillStyle = PAL.void; ctx.fillRect(0, 0, canvas.width, canvas.height);
   applyCamera();
   ctx.drawImage(BG, 0, 0);
-  drawShelves(); drawFaceBars(); drawEndcaps(); drawTags(); drawTrash(); drawEvents(); drawBackroom();
+  drawShelves(); drawFaceBars(); drawEndcaps(); drawTags(); drawTrash(); drawEvents(); drawBackroom(); drawReclaim();
   if (G.phase === 'night') drawTrailer();
   G.pallets.forEach(p => drawPallet(p));
   G.floats.forEach(drawFloatMaybeCrooked);
   drawBirds();
   drawGobacks();
+  drawDamages();
   drawCountMarks();
   RT.customers.forEach(drawCustomer);
   Object.values(RT.vendorNpcs).forEach(drawVendor);
   G.crew.forEach(c => { const r = RT.crew[c.id]; if (r && r.inBuilding) drawCrew(c, r); });
-  if (!G.player.away) { drawTarget(); drawPlayer(); drawHeldGobacks(G.player); }
+  if (!G.player.away) { drawTarget(); drawPlayer(); drawHeldGobacks(G.player); drawHeldDamages(G.player); }
   RT.floaters.forEach(f => {
     ctx.globalAlpha = clamp(1.4 - f.t, 0, 1);
     label(ctx, f.text, f.x * T, f.y * T, { font: PX(10), color: f.color, outline: 'rgba(0,0,0,0.9)' });

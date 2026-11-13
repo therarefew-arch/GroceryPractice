@@ -47,6 +47,7 @@ function clockOut(quiet) {
   if (p.floatId) releaseFloat(true);
   if (p.birdId) releaseBird(false);
   if (p.gobacks && p.gobacks.length) playerDropGobacks();
+  playerDropDamages();
   if (p.pallet) {
     if (p.pallet.empty) G.empties.push({ id: p.pallet.id, x: p.x, y: p.y });
     else if (G.phase === 'night') G.trailer.unshift(p.pallet);
@@ -163,10 +164,13 @@ function helpPlan(c, r) {
   if (G.phase !== 'day') return null;
   return (!priceOnShift() ? planPrice(c, r) : null) ||
     (gobacksUrgent() ? planGobacks(c, r) : null) ||
+    (salesFloorDamages().length ? planDamages(c, r) : null) ||
+    (!priceOnShift() && reclaimDue() ? planReclaim(c, r) : null) ||
     planReturnBird(c, r) ||
     planBirdRunToday(c, r) ||
     planReplen(c, r, null, 0.9) ||
     (sweepDue() && G.dirt >= 5 && !RT.sweepClaim ? planSweep(c, r) : null) ||
+    planDamages(c, r) ||
     (G.time >= OPEN ? planFaceMessiest(c, r, 90) || planGobacks(c, r) : null);
 }
 function planSweep(c, r) {

@@ -8,7 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1380, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.17'; // bump the last number on every update
+const VERSION = '0.0.18'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -125,7 +125,7 @@ function buildTruck(order) {
   DEPTS.forEach(d => {
     const n = Math.max(0, Math.floor(order[d.id] || 0));
     const cs = []; for (let i = 0; i < n; i++) cs.push(makeCase(d.id));
-    misShip(cs);
+    misShip(cs); truckDamage(cs);
     if (d.cold) { for (let i = 0; i < cs.length; i += PALLET_SIZE) pallets.push({ id: nid(), cold: true, cases: cs.slice(i, i + PALLET_SIZE) }); }
     else dry.push(...cs);
   });
@@ -217,6 +217,7 @@ function newGame() {
   ensureBackroom();
   ensureFacing();
   ensureCounts();
+  ensureDamages();
   buildTruck(suggestedOrder()).forEach(p => placePallet(p));
   RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {};
   mail('Store Training', 'Welcome to your store!', [
@@ -239,8 +240,8 @@ function startDay() {
   G.phase = 'day';
   G.time = 300;
   if (G.day > 1) G.sat = G.sat * 0.6 + 32; // customers partly forgive overnight
-  RT.customers = []; RT.outsWarned = {}; RT.custAcc = 0; RT.replenClaim = {}; RT.faceClaim = {}; RT.gobackClaim = null; RT.voWarned = {};
-  ensureFacing();
+  RT.customers = []; RT.outsWarned = {}; RT.custAcc = 0; RT.replenClaim = {}; RT.faceClaim = {}; RT.gobackClaim = null; RT.voWarned = {}; RT.dmgClaim = null; RT.reclaimClaim = null;
+  ensureFacing(); ensureDamages();
   G.floats.forEach(f => {
     if (f.carriedBy === 'player') return;
     f.x = f.homeX; f.y = f.homeY; f.carriedBy = null; f.claimedBy = null; f.incoming = 0;
@@ -310,9 +311,9 @@ function endDay() {
   RT.vendorNpcs = {}; RT.customers = [];
   G.crew.forEach(despawnCrew);
   tenureDay();
-  countsEndDay();
+  countsEndDay(); damagesEndDay();
   const res = computeResults();
-  res.tips.push(...moraleDay(res), ...eventsTips(), ...backroomTips(), ...facingTips(), ...countsTips());
+  res.tips.push(...moraleDay(res), ...eventsTips(), ...backroomTips(), ...facingTips(), ...countsTips(), ...damagesTips());
   DEPTS.forEach(d => {
     G.history[d.id].push(t.demand[d.id] || 0);
     if (G.history[d.id].length > 14) G.history[d.id].shift();
@@ -321,7 +322,7 @@ function endDay() {
   res.badges.forEach(b => { G.badges[b] = (G.badges[b] || 0) + 1; });
   G.bank += res.bonus;
   addXP(res.xp);
-  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res), ...laborDayExtras(), ...backroomDayExtras(), ...facingDayExtras(), ...countsDayExtras() });
+  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res), ...laborDayExtras(), ...backroomDayExtras(), ...facingDayExtras(), ...countsDayExtras(), ...damagesDayExtras() });
   if (G.pastDays.length > 30) G.pastDays.shift();
   updateRecords(G.pastDays[G.pastDays.length - 1]);
   if (dowOf(G.day) === 'Fri') {
@@ -364,6 +365,7 @@ function computeResults() {
   if ((t.coached || 0) >= 4) badges.push('coach');
   if (facedAll(90) && !(G.gobacks || []).length) badges.push('facedUp');
   if (countsToday().length && countsToday().every(k => k.status === 'done')) badges.push('countKeeper');
+  if (t.claims && !t.claimsMissed) badges.push('claimsClerk');
   const tips = [];
   if (t.misses) {
     const worst = Object.entries(t.lost).sort((a, b) => b[1] - a[1])[0];
@@ -480,7 +482,7 @@ function orderWindowTick(prev) {
 
 function onHour(h) {
   if (h >= 9 && h <= 21) spoilCheck();
-  mentorHour(); trashHour(); moraleHour(); eventsHour(h); backroomHour(); facingHour(h);
+  mentorHour(); trashHour(); moraleHour(); eventsHour(h); backroomHour(); facingHour(h); damagesHour();
   if (h === 13 && G.sat < 55) mail('Customer Service Desk', 'Complaints are piling up', 'We\'re getting a lot of complaints about empty shelves and wrong prices today. Can someone check the floor?');
   if (h === 16) toast('🛒 Rush hour is coming (4–7 PM). Top off the fast movers now!', 'warn');
   if (h % 2 === 0) save();
@@ -582,6 +584,7 @@ function buy(cu, dept) {
   G.sat = Math.min(100, G.sat + 0.06);
   shopMess(dept, got, cu);
   countsOnBuy(dept, got);
+  shelfDamage(dept, cu);
   const tag = G.tags.find(tg => tg.dept === dept && tg.kind === 'error') || G.tags.find(tg => tg.dept === dept);
   if (tag && Math.random() < (tag.kind === 'error' ? 0.08 : 0.03)) {
     t.scanLoss += 2.5; G.sat = Math.max(0, G.sat - 0.5);
@@ -616,6 +619,7 @@ function updateVendors(dt) {
 }
 
 function checkInVendor(v, byPlayer) {
+  vendorCredits(v);
   v.state = 'stocking';
   G.today.vendorsIn++;
   const n = RT.vendorNpcs[v.name];
@@ -648,7 +652,7 @@ function moveAlong(e, dt, speed) {
 function rt(c) {
   return RT.crew[c.id] || (RT.crew[c.id] = {
     x: MAPD.staffDoor.x + 0.5, y: MAPD.staffDoor.y + 0.5, fx: 0, fy: 1, inBuilding: false, plan: null, path: null,
-    carry: [], floatId: null, pallet: null, cleanups: [], progress: 0, label: '', intent: '', gobacks: [],
+    carry: [], floatId: null, pallet: null, cleanups: [], progress: 0, label: '', intent: '', gobacks: [], damages: [],
   });
 }
 const sf = c => (0.7 + 0.12 * c.skill) * (isStar(c) ? 1.15 : 1) * moraleSpeed(c) * orderSpeed(c);
@@ -662,7 +666,7 @@ function onShift(c) {
 function finishPlan(c, r) {
   r.cleanups.forEach(fn => fn());
   r.cleanups = [];
-  dropCrewGobacks(r);
+  dropCrewGobacks(r); binCrewDamages(r);
   if (r.floatId) {
     const f = floatById(r.floatId);
     if (f) { f.carriedBy = null; if (f.claimedBy === c.id) f.claimedBy = null; }
@@ -726,6 +730,7 @@ function goEnt(getter) {
 function takeCases(p, dept, n) {
   const out = [];
   for (let i = p.cases.length - 1; i >= 0 && out.length < n; i--) if (p.cases[i].d === dept) out.push(p.cases.splice(i, 1)[0]);
+  crushCheck(out, p, false);
   cardboard(out.length);
   if (!p.cases.length) removeEmptyPallets();
   return out;
@@ -917,12 +922,12 @@ function planIdle(c, r) {
 function brain(c, r) {
   const role = ROLES[c.role];
   switch (c.role) {
-    case 'breakdown': return (backroomUrgent() ? planBackroom(c, r) : null) || planBreakdown(c, r) || planBackroom(c, r) || planFreight(c, r, null, 30) || planReplen(c, r, null, 0.5);
+    case 'breakdown': return (backroomUrgent() ? planBackroom(c, r) : null) || planBreakdown(c, r) || planDamages(c, r) || planBackroom(c, r) || planFreight(c, r, null, 30) || planReplen(c, r, null, 0.5);
     case 'freight': return planFreight(c, r, null, 20) || planBirdRunToday(c, r) || planReplen(c, r, null, 0.6) || planBreakdown(c, r);
     case 'replen': return planBirdRunToday(c, r) || planReplen(c, r, null, 0.75) || planFreight(c, r, null, 25);
     case 'dsd': return planDSD(c, r) || planReplen(c, r, null, 0.6);
-    case 'price': return planPrice(c, r) || planCount(c, r) || planReplen(c, r, null, 0.5);
-    case 'unloader': return planUnload(c, r) || (backroomUrgent() ? planBackroom(c, r) : null) || planBreakdown(c, r) || planBackroom(c, r) || planFreight(c, r, null, 20);
+    case 'price': return planPrice(c, r) || planCount(c, r) || planReclaim(c, r) || planReplen(c, r, null, 0.5);
+    case 'unloader': return planUnload(c, r) || (backroomUrgent() ? planBackroom(c, r) : null) || planBreakdown(c, r) || planDamages(c, r) || planBackroom(c, r) || planFreight(c, r, null, 20);
     default: {
       const D = [role.dept];
       return planReplen(c, r, D, 0.85) || planFreight(c, r, D, 6) || planBreakdown(c, r, D) || planCount(c, r, D) ||
@@ -1096,6 +1101,7 @@ function getInteraction() {
   if (trash) return { label: 'Pick up the cardboard', fn: () => pickUpTrash(trash), at: trash, rep: true };
   if (p.gobacks && p.gobacks.length) { const gi = gobackInteraction(p, shelfDept, shelf); if (gi) return gi; }
   else if (!p.carry.length) { const gp = gobackPickup(p); if (gp) return gp; }
+  const dmi = damageInteraction(p); if (dmi) return dmi;
   const pal = nearest(G.pallets, p, 1.35);
   const fl = nearest(G.floats, p, 1.4, f => !f.carriedBy);
   if (p.carry.length) {
@@ -1154,6 +1160,7 @@ function playerPick(pal) {
   if (room <= 0 || !pal.cases.length) return;
   const first = pal.cases.pop(), got = [first];
   for (let i = pal.cases.length - 1; i >= 0 && got.length < room; i--) if (pal.cases[i].d === first.d) got.push(pal.cases.splice(i, 1)[0]);
+  crushCheck(got, pal, true);
   p.carry.push(...got);
   cardboard(got.length);
   if (!pal.cases.length) removeEmptyPallets();
@@ -1236,6 +1243,7 @@ function save() {
       if (!r) continue;
       r.carry.forEach(cs => { s.stock[cs.d].back += caseUnits(cs); });
       (r.gobacks || []).forEach(g => { (s.gobacks = s.gobacks || []).push({ ...g, where: 'cart' }); });
+      (r.damages || []).forEach(d => { (s.damages = s.damages || []).push({ ...d, where: 'bin', x: RECLAIM_C.x, y: RECLAIM_C.y }); });
       if (r.pallet && r.pallet.empty) s.empties.push({ id: r.pallet.id, x: r.x, y: r.y });
       else if (r.pallet) { if (s.phase === 'night') s.trailer.unshift(r.pallet); else s.pallets.push({ ...r.pallet, x: r.x, y: r.y }); }
     }
@@ -1267,9 +1275,10 @@ function load() {
     ensureLayout();
     ensureFacing();
     ensureCounts();
+    ensureDamages();
     if (G.phase === 'day' && (!G.counts || G.counts.day !== G.day)) countsStartDay();
     if (!G.list && G.phase === 'day') G.list = buildChecklist();
-    RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {}; RT.faceClaim = {}; RT.gobackClaim = null; RT.countClaim = {};
+    RT.crew = {}; RT.customers = []; RT.vendorNpcs = {}; RT.replenClaim = {}; RT.faceClaim = {}; RT.gobackClaim = null; RT.countClaim = {}; RT.dmgClaim = null; RT.reclaimClaim = null;
     G.vendorsToday.forEach(v => {
       if (v.state === 'waiting') RT.vendorNpcs[v.name] = { x: MAPD.vendorSpot.x + 0.5, y: MAPD.vendorSpot.y + 0.5, fx: 0, fy: 1, path: null, mode: 'wait', v };
     });

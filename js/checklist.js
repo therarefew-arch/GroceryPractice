@@ -44,6 +44,7 @@ const TASK_CHECK = {
   empties: () => !G.empties.length,
   floatsStraight: () => !crookedFloats().length,
   birds: () => !birdsOnFloor().length,
+  reclaim: () => !floorDamages().length && !binToScan().length && !(G.player.damages || []).length,
   counts: () => countsToday().length > 0 && countsToday().every(k => k.status === 'done'),
   faced: a => G.time >= (a.from || 0) && facedAll(a.pct),
   gobacks: a => (G.gobacks || []).length <= (a.max || 0) && !coldGobacks().length,
@@ -73,6 +74,7 @@ function buildChecklist() {
   add('closerun', 'shelves', 'Close run: water, milk, eggs, ice', 'Beverage, dairy and frozen 85%+ at 10:45 PM', 1365, 'at', { depts: ['A2', 'DAI', 'FRZ'], pct: 0.85 });
   add('faceclose', 'faced', 'Close recovery: face every aisle', 'Every aisle 85%+ faced at 10:50 PM', 1370, 'at', { pct: FACE_GOOD });
   add('gobacks', 'gobacks', 'Go-backs worked', 'Go-back cart and strays cleared at 10:50 PM (2 or fewer, nothing cold)', 1370, 'at', { max: 2 });
+  add('reclaim', 'reclaim', 'Reclaim worked', 'No damages on the floor, reclaim scanned out (vendor items wait for the vendor) at 10:55 PM', 1375, 'at');
   add('sweep-mid', 'swept', 'Mid-day backroom sweep', 'E anywhere in the backroom, between 11 AM and 3 PM', 900, 'by', { after: 660 });
   add('birds', 'birds', 'No birds on the sales floor', 'Every bird is parked in BACKSTOCK and nothing overflows (checked at 2 PM)', 840, 'at');
   add('empties', 'empties', 'Empty pallets stacked in reload staging', 'Nothing left on the receiving spots at close', 1375, 'at');

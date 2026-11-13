@@ -29,7 +29,8 @@ const STD = {
   rplnUnitsPH: 350, // units sold per replenishment hour
   rplnMin: 3,
   recovery: 1.5,
-  countHrs: 0.4,    // per cycle count (shelf + backstock)    // facing and go-backs at 5 PM and close
+  countHrs: 0.4,
+  reclaimHrs: 0.5,  // pulling and scanning damages    // per cycle count (shelf + backstock)    // facing and go-backs at 5 PM and close
   tagHrs: 0.25,     // per price change tag
   adFlip: 3,        // Tue night
   adVerify: 1,      // Wed
@@ -187,7 +188,7 @@ function dayDemand(day) {
     truck: dry / STD.dryCPH,
     rpln: Math.max(STD.rplnMin, units / STD.rplnUnitsPH) + STD.recovery,
     liquor: 0,
-    scan: tags * STD.tagHrs + COUNT_PER_DAY * STD.countHrs + (dow === 'Tue' ? STD.adFlip : 0) + (dow === 'Wed' ? STD.adVerify : 0),
+    scan: tags * STD.tagHrs + COUNT_PER_DAY * STD.countHrs + STD.reclaimHrs + (dow === 'Tue' ? STD.adFlip : 0) + (dow === 'Wed' ? STD.adVerify : 0),
   };
 }
 function weeklyDemand(w) {

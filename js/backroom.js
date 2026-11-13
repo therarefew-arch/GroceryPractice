@@ -23,6 +23,7 @@ const STOP_ROOM = { 1: 0, 2: 3, 3: 99 }; // reload slots a truck can take, by st
 function setupBackroom() {
   RELOAD_TILES.forEach(t => { MAPD.grid[t.y][t.x] = 'L'; });
   MAPD.grid[BALER.y][BALER.x] = 'K';
+  setupReclaim();
 }
 function ensureBackroom() {
   G.empties = G.empties || [];
