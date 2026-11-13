@@ -18,7 +18,7 @@ const ROLE_KINDS = {
   freight: ['truck', 'freight', 'fill', 'bird', 'trash'],
   replen: ['fill', 'bird', 'face', 'gobacks', 'trash'],
   dsd: ['dsd', 'fill'],
-  price: ['price', 'count', 'reclaim', 'fill'],
+  price: ['price', 'count', 'reclaim', 'fill', 'recall'],
   unloader: ['unload', 'truck', 'breakdown', 'backroom', 'reclaim'],
 };
 const ORDERS = {
@@ -34,6 +34,7 @@ const ORDERS = {
   gobacks: { name: 'Work go-backs', desc: 'Clear the go-back cart and any strays, cold first, back to their own shelves' },
   dsd: { name: 'Watch the back door', desc: 'Check in DSD vendors as they arrive' },
   price: { name: 'Hang price tags', desc: 'Hang tags and fix scan errors' },
+  recall: { name: 'Pull the recall', desc: 'Pull the recalled item off the shelf, out of backstock and off any freight' },
   trash: { name: 'Pick up cardboard', desc: 'Clear cardboard off the floor' },
   backroom: { name: 'Backroom upkeep', desc: 'Stack empties, bale, sweep' },
 };
@@ -81,6 +82,7 @@ function orderPlan(c, r) {
     case 'reclaim': p = planDamages(c, r) || planReclaim(c, r); break;
     case 'count': if (!o.started) { countAdd(o.dept); o.started = true; } p = planCount(c, r, [o.dept]); break;
     case 'price': p = planPrice(c, r) || planOutTag(c, r); break;
+    case 'recall': p = planRecall(c, r); break;
     case 'trash': p = planTrash(c, r); break;
     case 'backroom': p = planBackroomForced(c, r); break;
     case 'dsd': p = planDSD(c, r) || (o.until - G.time > 1 ? waitAtBackDoor(c, r) : null); break;
@@ -146,7 +148,7 @@ function showOrders(c) {
   h += deptRow('bird', d => `${backCases(d)} cs`);
   h += deptRow('face', d => `${Math.round(faceOf(d))}%`);
   h += deptRow('count', d => { const k = countOpen(d), n = daysSinceCount(d); return k ? 'on list' : n == null ? 'never' : n + 'd ago'; });
-  h += `<div style="margin:6px 0"><b>Other</b><div>${btn('dsd', null, waiting ? `${waiting} waiting` : '')}${btn('gobacks', null, `${(G.gobacks || []).length}`)}${btn('reclaim', null, `${floorDamages().length + binToScan().length}`)}${btn('price', null, `${G.tags.length + outTagJobs().length} tags`)}${btn('trash', null, `${trashN}`)}${btn('backroom', null, `dirt ${Math.round(G.dirt || 0)}%`)}</div></div>`;
+  h += `<div style="margin:6px 0"><b>Other</b><div>${btn('dsd', null, waiting ? `${waiting} waiting` : '')}${btn('gobacks', null, `${(G.gobacks || []).length}`)}${btn('reclaim', null, `${floorDamages().length + binToScan().length}`)}${btn('price', null, `${G.tags.length + outTagJobs().length} tags`)}${openRecalls().length ? btn('recall', null, `${openRecalls()[0].item}`) : ''}${btn('trash', null, `${trashN}`)}${btn('backroom', null, `dirt ${Math.round(G.dirt || 0)}%`)}</div></div>`;
   h += `<div class="row" style="justify-content:flex-end;margin-top:10px"><button class="primary" onclick="UI.hideModal()">Done</button></div>`;
   UI.showModal(h);
 }

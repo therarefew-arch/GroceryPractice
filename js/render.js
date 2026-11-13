@@ -513,6 +513,7 @@ function render() {
   drawGobacks();
   drawDamages();
   drawCountMarks();
+  drawRecallMarks();
   RT.customers.forEach(drawCustomer);
   Object.values(RT.vendorNpcs).forEach(drawVendor);
   G.crew.forEach(c => { const r = RT.crew[c.id]; if (r && r.inBuilding) drawCrew(c, r); });

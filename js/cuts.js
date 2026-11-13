@@ -95,7 +95,7 @@ function cutsStartDay() {
       ? `  • ON ALLOCATION: ${o.item} (${DEPT[o.dept].name}). The manufacturer is short. Max ${plural(o.cap, 'case')} per store per order until about ${wd(o.back)} (Day ${o.back}). Anything over that is cut.`
       : `  • OUT: ${o.item} (${DEPT[o.dept].name}). Every case ordered will be cut. Expected back ${wd(o.back)} (Day ${o.back}).`));
     slipped.forEach(o => L.push(`  • STILL OUT: ${o.item}. The new date is ${wd(o.back)} (Day ${o.back}).`));
-    back.forEach(o => L.push(o.kind === 'alloc' ? `  • Allocation lifted: ${o.item}. Order normally.` : `  • BACK IN: ${o.item}. It ships on your next ${DEPT[o.dept].name} order. Pull the "temporarily out" tag once it's on the shelf.`));
+    back.forEach(o => L.push(o.kind === 'alloc' ? `  • Allocation lifted: ${o.item}. Order normally.` : `  • BACK IN: ${o.item}. It ships on your next ${DEPT[o.dept].name} order. Take the ${o.recall ? 'recall notice' : '"temporarily out" tag'} down once it's on the shelf.`));
     const still = knownOuts().filter(o => !news.includes(o) && !slipped.includes(o));
     if (still.length) { L.push('', 'Still out or limited:'); still.forEach(o => L.push(`  • ${o.item}: ${o.kind === 'alloc' ? `max ${o.cap} cs per order` : 'out'} until about ${wd(o.back)}`)); }
     L.push('', 'Your suggested order doesn\'t know about cuts. When an item is out, its customers buy the rest of the department: order that up. Tag every hole so customers know it\'s us, not you.');
@@ -120,7 +120,7 @@ function cutCases(dept, cs) {
     else if (Math.random() < SELECT_SHORT) why = 'select';
     if (!why) continue;
     cs.splice(i, 1); add(it, why, o);
-    if (o) { o.cut++; o.hidden = false; if (o.kind === 'out') o.hole = true; }
+    if (o) { o.cut++; o.hidden = false; if (o.kind === 'out' && !o.recall) o.hole = true; }
   }
   // an item that's back at the warehouse and shipped tonight is on the shelf tomorrow
   G.whOuts.forEach(o => { if (o.dept === dept && o.state === 'back' && o.hole && !o.restockDay && cs.some(c => c.item === o.item)) o.restockDay = G.day + 1; });
@@ -191,7 +191,7 @@ function outTagInteraction(p) {
   const n = nearest(jobs, p, 1.5);
   if (!n) return null;
   const o = n.o, pull = o.state === 'pull';
-  return { label: pull ? `Pull the out tag: ${o.item} is back in stock` : `Hang a "temporarily out" tag: ${o.item} (warehouse out${o.state === 'out' ? `, back about ${wd(o.back)}` : ', on its way'})`, fn: () => startWork(1.5, pull ? 'Pulling tag' : 'Hanging out tag', () => doOutTag(o, null)), at: n };
+  return { label: pull ? `Take down the ${o.recall ? 'recall notice' : 'out tag'}: ${o.item} is back in stock` : o.recall ? `Post the recall notice: ${o.item}` : `Hang a "temporarily out" tag: ${o.item} (warehouse out${o.state === 'out' ? `, back about ${wd(o.back)}` : ', on its way'})`, fn: () => startWork(1.5, pull ? 'Pulling tag' : 'Hanging out tag', () => doOutTag(o, null)), at: n };
 }
 function planOutTag(c, r) {
   if (G.phase !== 'day') return null;
@@ -273,7 +273,7 @@ function cutsOrderPanel(td) {
   const outs = knownOuts().filter(o => deptOnTruck(o.dept, td));
   let h = '<h3>Warehouse</h3>';
   if (!outs.length) h += '<p class="mute">Nothing out or on allocation for tonight\'s departments. A few cases still get cut at selection on any night (about 1%).</p>';
-  else h += '<table><tr><th>Item</th><th>Department</th><th>Status</th><th class="n">Share of dept cases</th></tr>' + outs.map(o => `<tr><td>${o.item}</td><td>${DEPT[o.dept].name}</td><td class="${o.kind === 'alloc' ? 'warn' : 'bad'}">${o.kind === 'alloc' ? `Allocation: max ${plural(o.cap, 'case')} per order` : 'Out: every case cut'} · until about ${wd(o.back)}</td><td class="n">${Math.round(itemShare(o.dept, o.item) * 100)}%</td></tr>`).join('') + '</table><p class="mute">The suggested order doesn\'t know about cuts. "Ships ≈" is what to expect after known cuts. When an item is out, its customers buy the rest of the department, so order up to cover it.</p>';
+  else h += '<table><tr><th>Item</th><th>Department</th><th>Status</th><th class="n">Share of dept cases</th></tr>' + outs.map(o => `<tr><td>${o.item}</td><td>${DEPT[o.dept].name}</td><td class="${o.kind === 'alloc' ? 'warn' : 'bad'}">${o.kind === 'alloc' ? `Allocation: max ${plural(o.cap, 'case')} per order` : o.recall ? 'Recalled: every case cut' : 'Out: every case cut'} · until about ${wd(o.back)}</td><td class="n">${Math.round(itemShare(o.dept, o.item) * 100)}%</td></tr>`).join('') + '</table><p class="mute">The suggested order doesn\'t know about cuts. "Ships ≈" is what to expect after known cuts. When an item is out, its customers buy the rest of the department, so order up to cover it.</p>';
   const lg = G.cutLog || [], rep = lg[lg.length - 1];
   if (rep) h += `<p class="mute">Last cut report (${wd(rep.day)} night, Day ${rep.day}): ordered ${rep.ordered}, shipped ${rep.ordered - rep.cut} (${((rep.ordered - rep.cut) / rep.ordered * 100).toFixed(1)}%)${rep.rows.length ? ': ' + rep.rows.map(r => `${r.item} ${r.cs} (${CUT_WHY[r.why]})`).join(', ') : ''}.</p>`;
   return h;
@@ -308,8 +308,9 @@ function drawOutTags() {
     if (o.hole && G.phase === 'day') { ctx.fillStyle = '#07090c'; ctx.fillRect(px + 3, py + T - 13, 13, 9); }
     if (o.tagged) {
       const stale = o.state === 'pull';
-      glowRect(ctx, px + 2, py + T - 12, 16, 8, stale ? (blink ? '#3cc47c' : '#e8962e') : '#e8962e', 6);
-      label(ctx, 'OUT', px + 10, py + T - 7.5, { font: PX(6), color: '#000' });
+      const col = o.recall ? '#ff3b30' : '#e8962e';
+      glowRect(ctx, px + 2, py + T - 12, 16, 8, stale ? (blink ? '#3cc47c' : col) : col, 6);
+      label(ctx, o.recall ? 'RCL' : 'OUT', px + 10, py + T - 7.5, { font: PX(6), color: o.recall ? '#fff' : '#000' });
     }
   }
 }

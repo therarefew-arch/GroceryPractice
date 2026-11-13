@@ -68,7 +68,7 @@ function buildWeekReview(week) {
   const spoiled = S(d => d.spoiled || 0);
   const worst = days.slice().sort((a, b) => a.score - b.score)[0], best = days.slice().sort((a, b) => b.score - a.score)[0];
   const notes = [], praise = [];
-  const note = (title, saw, why, fix) => notes.push({ title, saw, why, fix });
+  const note = (title, saw, why, fix, urgent) => (urgent ? notes.unshift({ title, saw, why, fix }) : notes.push({ title, saw, why, fix })); // urgent = customer safety: leads the review
 
   if (inStock < 0.95) note('In-stock', `In-stock ran ${(inStock * 100).toFixed(1)}% this week. ${misses} customers walked up to an empty shelf.`,
     'Every out is a sale you never get back, and a customer who just learned the store down the road has it. Outs also hide in your numbers: lost sales never show up as sales, so next week\'s forecast comes in low and the hole gets bigger.',
@@ -84,7 +84,7 @@ function buildWeekReview(week) {
   else praise.push(`Labor came in at ${laborPct.toFixed(1)}%, on target.`);
 
   laborReviewNotes(days, note, praise);
-  backroomReviewNotes(days, note); facingReviewNotes(days, note, praise); countsReviewNotes(days, note, praise); damagesReviewNotes(days, note, praise); cutsReviewNotes(days, note, praise);
+  backroomReviewNotes(days, note); facingReviewNotes(days, note, praise); countsReviewNotes(days, note, praise); damagesReviewNotes(days, note, praise); cutsReviewNotes(days, note, praise); recallsReviewNotes(days, note, praise);
   if (truckDays.length && truckNoon < truckDays.length) note('Truck', `The truck was worked by noon on ${truckNoon} of ${truckDays.length} truck days.`,
     'Freight still out at noon blocks the aisles during the busiest hours, cold product loses life every hour it sits, and backstock never gets run.',
     'Staff the truck shifts to the cases: about 45 cases an hour per person. Break down by aisle so floats go straight to the right aisle, and work cold first.');

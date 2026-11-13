@@ -29,6 +29,9 @@ const TASK_CHECK = {
   shelves: a => a.depts.every(d => shelfPct(d) >= a.pct),
   backstock: a => G.stock[a.dept].back <= DEPT[a.dept].upc * 2 || !canStock(a.dept),
   outtags: () => !outTagJobs().length,
+  recallshelf: a => { const rs = recallById(a.id); return !rs || rs.shelfAt != null; },
+  recallall: a => { const rs = recallById(a.id); return !rs || (rs.shelfAt != null && rs.backAt != null && !recallFreight(rs).length); },
+  recallcert: a => { const rs = recallById(a.id); return !rs || rs.state !== 'open'; },
   invoices: () => (G.today.invoicesClosed || []).length >= lastNightTrucks().length + 1,
   oos: () => G.today.oosLogged != null,
   blitz: () => DEPTS.every(d => shelfPct(d.id) >= 0.4),
@@ -62,6 +65,7 @@ function buildChecklist() {
   (BACKSTOCK_RUNS[dow] || []).forEach(d => add('bs-' + d, 'backstock', `Backstock run: ${DEPT[d].aisle} birds`, 'Work backstock to the shelf by noon', 720, 'by', { dept: d }));
   const trucks = lastNightTrucks();
   if (countsToday().length) add('counts', 'counts', `Cycle counts: ${countsToday().map(k => DEPT[k.dept].aisle).join(', ')}`, 'Count each shelf (E) and its backstock bird (E) so the system on-hand is right before you order', 1260, 'by');
+  recallTasks(add);
   add('invoices', 'invoices', `Invoices closed: ${trucks.join(', ')} + DSD`, 'Office computer → Today. A truck closes once its freight is worked: claim any shorts first', 1370, 'by');
   { const n = holes().filter(o => !o.tagged).length, pl = (G.whOuts || []).filter(o => o.state === 'pull').length;
     if (n || pl) add('outtags', 'outtags', 'Warehouse-out tags current', `${n ? `Tag ${plural(n, 'hole')} left by warehouse cuts` : ''}${n && pl ? ', ' : ''}${pl ? `pull ${plural(pl, 'tag')} for items that are back` : ''} (E at the shelf)`, 720, 'by'); }
