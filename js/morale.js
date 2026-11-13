@@ -192,7 +192,7 @@ function resolveConflict(choice) {
     good = sev <= 2; verdict = sev <= 2 ? 'It works for today.' : 'You stopped the scene, but that\'s it.';
     why = 'Splitting them up ends the moment, but nothing gets solved and it tends to come back. It\'s fine when you\'re slammed. Follow up with both of them later.';
   } else if (choice === 'writeup') {
-    a.strikes++; bump(a, sev === 1 ? -10 : -5, 'writeup');
+    a.strikes++; bump(a, sev === 1 ? -10 : -5, 'writeup'); discFromConflict(a);
     if (sev >= 2) { bump(b, 4, 'fair'); good = true; verdict = `Documented: ${a.name} now has ${a.strikes} write-up${a.strikes > 1 ? 's' : ''}.`; why = 'Heated or serious behavior needs to be on paper. It sets a clear expectation, and if it keeps happening you have the history to act on.'; }
     else { teamBump(-1, 'writeup'); good = false; verdict = 'A write-up for that is heavy-handed.'; why = 'A disagreement about a float or a pallet jack isn\'t misconduct. Writing it up feels like a grudge and makes people stop telling you about problems.'; }
   } else if (choice === 'home') {

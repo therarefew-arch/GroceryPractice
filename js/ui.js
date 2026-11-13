@@ -261,12 +261,12 @@ const UI = {
     h += `<table><tr><th>Name</th><th>Role</th><th>Usual shift</th><th>Skill</th><th>Rank</th><th>Training</th><th>Morale</th><th class="n">Coached</th><th class="n">Days</th><th class="n">Wage</th><th>Right now</th><th></th></tr>`;
     for (const c of G.crew) {
       const r = RT.crew[c.id];
-      const status = c.calledOut ? '<span class="bad">Called out</span>' : !curShift(c) ? '<span class="mute">Off today</span>' : onShift(c) ? (r && r.inBuilding ? `<span class="good">${r.intent || 'On the clock'}</span>` : 'Clocking in') : '<span class="mute">Off the clock</span>';
-      h += `<tr><td><span class="dot" style="background:${ROLES[c.role].color}"></span>${esc(c.name)}<div class="mute" style="font-size:12px">${availText(c.avail)}</div></td>
+      const status = c.calledOut ? (c.ncnsDay === G.day ? '<span class="bad">No-call no-show</span>' : '<span class="bad">Called out</span>') : isLate(c) ? '<span class="warn">Late, not here yet</span>' : !curShift(c) ? '<span class="mute">Off today</span>' : onShift(c) ? (r && r.inBuilding ? `<span class="good">${r.intent || 'On the clock'}</span>` : 'Clocking in') : '<span class="mute">Off the clock</span>';
+      h += `<tr><td><span class="dot" style="background:${ROLES[c.role].color}"></span>${esc(c.name)}${discBadge(c)}<div class="mute" style="font-size:12px">${availText(c.avail)}</div></td>
         <td><select onchange="UI.setRole(${c.id},this.value)">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${k === c.role ? 'selected' : ''}>${v.name}</option>`).join('')}</select></td>
         <td><select onchange="UI.setShift(${c.id},this.value)">${Object.entries(SHIFTS).map(([k, v]) => `<option value="${k}" ${k === c.shift ? 'selected' : ''}>${v.name}</option>`).join('')}</select></td>
         <td>${stars(c.skill)}</td><td>${rankHTML(c)}</td><td>${trainMeter(c)}</td><td title="${TRAITS[ensureMorale(c).trait].desc}" style="white-space:nowrap">${moodOf(c).icon} ${Math.round(c.morale)}% <span class="mute">${TRAITS[c.trait].name}</span>${c.strikes ? ` <span class="warn">${c.strikes}✎</span>` : ''}</td><td class="n">${c.coached || 0}</td><td class="n">${c.days || 0}</td><td class="n">$${c.wage.toFixed(2)}/hr<div class="mute" style="font-size:11px">${reviewDue(c) ? '<span class="warn">review due</span>' : `review Day ${c.nextReview}`}</div></td><td>${status}${c.needsCoach ? ' <span class="bad">⚠ needs coaching</span>' : ''}${c.notice ? ` <span class="bad">🚪 gave notice (last day ${c.notice})</span>` : ''}${c.promoAsk ? ' <span class="warn">📈 asked to move up</span>' : ''}${c.sentHome === G.day ? ' <span class="mute">sent home</span>' : ''}</td>
-        <td style="white-space:nowrap">${c.lead ? '<span class="good">◆ Lead</span> ' : canPromote(c) ? `<button onclick="UI.promote(${c.id})">Promote</button> ` : ''}${reviewDue(c) ? `<button class="${G.day - c.nextReview >= PERF_LATE ? 'danger' : 'primary'}" onclick="UI.review(${c.id})">📝 Review${G.day > c.nextReview ? ` (${G.day - c.nextReview}d late)` : ''}</button> ` : ''}<button onclick="showOrders(G.crew.find(x => x.id === ${c.id}))">📌 Orders</button> <button class="danger" onclick="UI.fire(${c.id})">Fire</button></td></tr>`;
+        <td style="white-space:nowrap">${c.lead ? '<span class="good">◆ Lead</span> ' : canPromote(c) ? `<button onclick="UI.promote(${c.id})">Promote</button> ` : ''}${reviewDue(c) ? `<button class="${G.day - c.nextReview >= PERF_LATE ? 'danger' : 'primary'}" onclick="UI.review(${c.id})">📝 Review${G.day > c.nextReview ? ` (${G.day - c.nextReview}d late)` : ''}</button> ` : ''}<button onclick="showOrders(G.crew.find(x => x.id === ${c.id}))">📌 Orders</button> <button class="${discDue(c) ? 'primary' : ''}" onclick="UI.disc(${c.id})" title="Corrective action">✎</button> <button class="danger" onclick="UI.fire(${c.id})">Fire</button></td></tr>`;
     }
     h += '</table>';
     const tdy = G.crew.map(c => [c, curShift(c)]).filter(([c, k]) => k && !c.calledOut);
@@ -404,7 +404,7 @@ const UI = {
   },
   fire(id) {
     const c = G.crew.find(x => x.id === id);
-    this.ask(`Let ${c.name} go?`, `This can't be undone. Write-ups on file: ${c.strikes || 0}. Firing without documentation hurts team morale.`, 'Let them go', () => {
+    this.ask(`Let ${c.name} go?`, `This can't be undone. Write-ups on file: ${c.strikes || 0}; discipline step: ${DISC_LEVELS[ensureDisc(c).disc.level]}. Firing without documentation hurts team morale. For attendance or performance, use ✎ Corrective action: HR approves a termination after a final warning.`, 'Let them go', () => {
       if (!G.crew.includes(c)) return;
       letGo(c, 'fired');
       toast(`${c.name} was let go.`);
@@ -617,6 +617,13 @@ const UI = {
   },
   huddle() { this.showModal(huddleSheetHTML()); },
   dmWalk() { const w = dmWalk(true); if (w) this.showModal(dmResultHTML(w)); else this.hideModal(); },
+  disc(id) { const c = G.crew.find(x => x.id === id); if (c) this.showModal(discSheetHTML(c)); },
+  discSubmit(id) {
+    const lv = +((document.querySelector('input[name="dc-lv"]:checked') || {}).value || 0);
+    const docs = [...document.querySelectorAll('.dc-doc:checked')].map(x => x.value);
+    const r = discDeliver(id, lv, docs);
+    if (r) this.showModal(discResultHTML(r)); else this.hideModal();
+  },
   repMeet() { const h = repPitchHTML(); if (h) this.showModal(h); },
   repPick(key) {
     const r = repAnswer(key);

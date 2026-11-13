@@ -65,6 +65,7 @@ function rollMistake(c, area, base) {
   if (G.today) G.today.crewMistakes = (G.today.crewMistakes || 0) + 1;
   const first = !c.needsCoach;
   c.needsCoach = { area, at: G.time, day: G.day };
+  discMistake(c, area);
   const r = RT.crew[c.id];
   if (r) floater(r.x, r.y - 1.2, '!', '#ff5a4e');
   if (first) toast(`⚠ ${c.name}: ${TRAIN_AREAS[area].mistake}. Walk over and press E to coach.`, 'warn');
