@@ -261,7 +261,7 @@ const UI = {
     for (const c of G.crew) {
       const r = RT.crew[c.id];
       const status = c.calledOut ? '<span class="bad">Called out</span>' : !curShift(c) ? '<span class="mute">Off today</span>' : onShift(c) ? (r && r.inBuilding ? `<span class="good">${r.intent || 'On the clock'}</span>` : 'Clocking in') : '<span class="mute">Off the clock</span>';
-      h += `<tr><td><span class="dot" style="background:${ROLES[c.role].color}"></span>${esc(c.name)}</td>
+      h += `<tr><td><span class="dot" style="background:${ROLES[c.role].color}"></span>${esc(c.name)}<div class="mute" style="font-size:12px">${availText(c.avail)}</div></td>
         <td><select onchange="UI.setRole(${c.id},this.value)">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${k === c.role ? 'selected' : ''}>${v.name}</option>`).join('')}</select></td>
         <td><select onchange="UI.setShift(${c.id},this.value)">${Object.entries(SHIFTS).map(([k, v]) => `<option value="${k}" ${k === c.shift ? 'selected' : ''}>${v.name}</option>`).join('')}</select></td>
         <td>${stars(c.skill)}</td><td>${rankHTML(c)}</td><td>${trainMeter(c)}</td><td title="${TRAITS[ensureMorale(c).trait].desc}" style="white-space:nowrap">${moodOf(c).icon} ${Math.round(c.morale)}% <span class="mute">${TRAITS[c.trait].name}</span>${c.strikes ? ` <span class="warn">${c.strikes}✎</span>` : ''}</td><td class="n">${c.coached || 0}</td><td class="n">${c.days || 0}</td><td class="n">$${c.wage.toFixed(2)}/hr</td><td>${status}${c.needsCoach ? ' <span class="bad">⚠ needs coaching</span>' : ''}${c.notice ? ` <span class="bad">🚪 gave notice (last day ${c.notice})</span>` : ''}${c.promoAsk ? ' <span class="warn">📈 asked to move up</span>' : ''}${c.sentHome === G.day ? ' <span class="mute">sent home</span>' : ''}</td>
@@ -313,6 +313,7 @@ const UI = {
     const s = schedFor(w), ws = weekStart(w), ti = w === cw ? dowIdx(G.day) : -1;
     let h = `<h2>🗓 Schedule</h2><div class="row">${[cw, cw + 1].map(x => `<button class="${x === w ? 'primary' : ''}" onclick="UI.schedWeek=${x};UI.render()">Week ${x} (${x === cw ? 'this week' : 'next week'})</button>`).join(' ')}</div>`;
     h += `<p class="mute">Week ${w}: ${fmtMD(ws)} to ${fmtMD(ws + 6)} · ${s.posted ? `<span class="good">Posted${s.postedBy === 'auto' ? ' (auto-posted)' : ''}</span>. Changes now cost that person's morale.` : `<span class="warn">Not posted.</span> Post it by Thursday ${fmtTime(SCHED_CUTOFF)}; after that, every change costs morale.`} Paid hours = shift length minus a 1-hour unpaid lunch on shifts over 6 hours. Over 40 paid hours in a week is overtime (1.5x). <b>You</b> are on here too: you come in for your shifts, and the crew runs the store when you're off (store managers are salaried, so your shifts count in full).</p>`;
+    h += ptoPanelHTML(w);
     const opt = (v, cur) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${v === OFF ? '— Off —' : SHIFTS[v].name}</option>`;
     h += `<div style="overflow-x:auto"><table style="font-size:15px"><tr><th>Name</th>${WEEKDAYS.map((d, i) => `<th${i === ti ? ' style="color:#fff3d6"' : ''}>${d} ${fmtMD(ws + i)}${i === ti ? ' ◀' : ''}</th>`).join('')}<th class="n">Hrs</th></tr>`;
     {
@@ -323,8 +324,9 @@ const UI = {
     }
     for (const c of G.crew) {
       const row = s.rows[c.id], hrs = weekPaidMin(w, c) / 60;
-      h += `<tr><td style="white-space:nowrap"><span class="dot" style="background:${ROLES[c.role].color}"></span>${esc(c.name)}<div class="mute" style="font-size:12px">${ROLES[c.role].name} · ${LD_ROWS.find(r => r.key === roleRow(c.role)).name}</div></td>` +
-        row.map((v, i) => `<td><select style="font-size:14px;max-width:118px${v === OFF ? ';color:#7a6a50' : ''}" ${i < ti ? 'disabled' : ''} onchange="UI.schedSet(${w},${c.id},${i},this.value)">${opt(OFF, v)}${Object.keys(SHIFTS).map(k => opt(k, v)).join('')}</select></td>`).join('') +
+      h += `<tr><td style="white-space:nowrap"><span class="dot" style="background:${ROLES[c.role].color}"></span>${esc(c.name)}<div class="mute" style="font-size:12px">${ROLES[c.role].name} · ${LD_ROWS.find(r => r.key === roleRow(c.role)).name}</div><div class="mute" style="font-size:12px">${availText(c.avail)}${c.availNext ? `<br><span class="warn">From wk ${c.availNext.from}: ${availText(c.availNext.row)}</span>` : ''}</div></td>` +
+        row.map((v, i) => { const day = ws + i, p = ptoOf(c.id, day), av = c.availNext && w >= c.availNext.from ? c.availNext.row : c.avail, bad = v !== OFF && ((p && p.state === 'approved') || !shiftFits(av[i], v)), na = av[i] && av[i] !== 'any';
+          return `<td${bad ? ' style="background:#6a1f1f" title="Won\'t come in: ' + (p && p.state === 'approved' ? 'approved day off' : 'outside their availability') + '"' : ''}><select style="font-size:14px;max-width:118px${v === OFF ? ';color:#7a6a50' : ''}" ${i < ti ? 'disabled' : ''} onchange="UI.schedSet(${w},${c.id},${i},this.value)">${opt(OFF, v)}${Object.keys(SHIFTS).map(k => opt(k, v)).join('')}</select>${p && p.state !== 'denied' ? `<div style="font-size:11px" class="${p.state === 'approved' ? 'good' : p.state === 'pending' ? 'warn' : 'bad'}">${p.state === 'approved' ? 'PTO' : p.state === 'pending' ? 'asked off' : 'asked off (no answer)'}</div>` : na ? `<div style="font-size:11px" class="mute">${AVAIL_WORD[av[i]]}</div>` : ''}</td>`; }).join('') +
         `<td class="n ${hrs > 40 ? 'bad' : ''}"><b>${hrs.toFixed(0)}</b>${hrs > 40 ? ' OT' : ''}</td></tr>`;
     }
     const sc = scheduledByRow(w), dd = WEEKDAYS.map((_, i) => dayDemand(ws + i));
@@ -341,7 +343,12 @@ const UI = {
     return h;
   },
   schedSet(w, id, i, v) { setSched(w, id, i, v); this.render(); },
-  schedPost(w) { postSchedule(w); this.render(); },
+  schedPost(w) {
+    const probs = schedProblems(w), pend = ptoPending().filter(p => weekOf(p.day) === w);
+    if (!probs.length && !pend.length) { postSchedule(w); this.render(); return; }
+    this.ask(`Post week ${w} with problems?`, [probs.length ? `${plural(probs.length, 'shift')} won't be worked: ${probs.slice(0, 4).map(x => `${x.c.name} on ${WEEKDAYS[x.i]} (${x.why})`).join('; ')}${probs.length > 4 ? '…' : ''}.` : '', pend.length ? `${plural(pend.length, 'time-off request')} for this week ${pend.length === 1 ? 'is' : 'are'} still unanswered; posting counts as a no.` : ''].filter(Boolean).join(' '), 'Post anyway', () => { postSchedule(w); this.render(); });
+  },
+  ptoAnswer(id, yes) { answerPto(id, yes); this.render(); },
   schedCopy(w) { const src = schedFor(w - 1), dst = schedFor(w); if (dst.posted) return; G.crew.forEach(c => { if (src.rows[c.id]) dst.rows[c.id] = src.rows[c.id].slice(); }); if (src.rows[MGR]) dst.rows[MGR] = src.rows[MGR].slice(); this.render(); },
   schedReset(w) { const dst = schedFor(w); if (dst.posted) return; G.crew.forEach((c, i) => { dst.rows[c.id] = defaultRow(c, i); }); dst.rows[MGR] = MGR_DEFAULT.slice(); this.render(); },
   tab_labor() {
@@ -408,7 +415,7 @@ const UI = {
     const full = G.crew.length >= maxCrew();
     let h = `<h2>Hiring</h2><p class="mute">New applicants every morning. ${full ? '<span class="warn">All crew slots are full — let someone go or level up.</span>' : `Open slots: ${maxCrew() - G.crew.length}.`} You can change a hire's role and shift later in Crew and 🗓 Schedule.</p><div class="cand">`;
     h += G.candidates.map(c => `<div class="card"><div class="v" style="font-size:16px">${esc(c.name)}</div><div><span class="dot" style="background:${ROLES[c.role].color}"></span>${ROLES[c.role].name}</div>
-      <div class="s" style="margin:4px 0">${ROLES[c.role].desc}</div><div>${stars(c.skill)} · <b>$${c.wage.toFixed(2)}/hr</b></div><div class="s">Training: ${c.exp != null ? c.exp : 0}% · new hires need coaching</div><div class="s">Wants: ${SHIFTS[c.shift].name}</div>
+      <div class="s" style="margin:4px 0">${ROLES[c.role].desc}</div><div>${stars(c.skill)} · <b>$${c.wage.toFixed(2)}/hr</b></div><div class="s">Training: ${c.exp != null ? c.exp : 0}% · new hires need coaching</div><div class="s">Wants: ${SHIFTS[c.shift].name}</div><div class="s">Available: ${availText(c.avail)}</div>
       <button class="primary" ${full ? 'disabled' : ''} onclick="UI.hire(${c.id})" style="margin-top:8px">Hire</button></div>`).join('') || '<p class="mute">No applicants left today. Check back tomorrow.</p>';
     h += '</div><p class="mute">Skill sets walking and working speed (★1 ≈ 82%, ★5 ≈ 130%). More skill costs more per hour.</p>';
     return h;
@@ -417,7 +424,7 @@ const UI = {
     if (G.crew.length >= maxCrew()) return;
     const k = G.candidates.find(x => x.id === id);
     G.candidates = G.candidates.filter(x => x !== k);
-    G.crew.push(ensureMorale(ensureTrain({ id: k.id, name: k.name, role: k.role, shift: k.shift, skill: k.skill, wage: k.wage, calledOut: false }, k.exp != null ? k.exp : hireTrainingBase(k.skill))));
+    G.crew.push(ensureMorale(ensureTrain({ id: k.id, name: k.name, role: k.role, shift: k.shift, avail: k.avail || makeAvail(k.shift), skill: k.skill, wage: k.wage, calledOut: false }, k.exp != null ? k.exp : hireTrainingBase(k.skill))));
     schedNewHire(G.crew[G.crew.length - 1]);
     toast(`Hired ${k.name} as ${ROLES[k.role].name} (${SHIFTS[k.shift].name}).`, 'good');
     this.render();

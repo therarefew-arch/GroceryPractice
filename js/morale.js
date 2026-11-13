@@ -22,6 +22,8 @@ const GRIPE_TEXT = {
   rough: 'Every day felt like a losing battle. We were always behind.',
   letGo: 'Watching people get let go out of nowhere made me feel like I was next.',
   writeup: 'That write-up felt unfair.',
+  timeoff: 'I asked for a day off that mattered and didn\'t get it, or never even got an answer.',
+  avail: 'I told you when I could work, and you kept scheduling me when I couldn\'t.',
 };
 const FIX_TEXT = {
   schedule: 'Keep schedules steady. Change someone\'s shift only when you have to, and tell them why.',
@@ -32,12 +34,15 @@ const FIX_TEXT = {
   rough: 'Bad days wear people down. Get the truck and the in-stock under control and the mood follows.',
   letGo: 'Coach and document before you fire anyone. The team watches how you treat people.',
   writeup: 'Write people up for real problems, and explain why. A write-up for a small thing feels like a grudge.',
+  timeoff: 'Answer time-off requests fast, and say yes when you can cover it. Approved early, a day off is easy to schedule around.',
+  avail: 'Schedule people inside their availability. The red cells on the schedule are shifts nobody will work.',
 };
 const LIKE_TEXT = {
   praised: 'You did notice my work. That meant something.',
   coached: 'I learned a lot from the coaching.',
   promoted: 'You gave me a shot as a lead. I won\'t forget that.',
   fair: 'You handled the drama fairly.',
+  heard: 'When I needed a day off, you made it work.',
 };
 
 function ensureMorale(c) {

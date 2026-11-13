@@ -64,8 +64,11 @@ function paidMin(sk) {
   return len > 360 ? len - BREAK_MIN : len;
 }
 function defaultRow(c, idx) {
-  const off = OFF_PAIRS[(idx != null ? idx : G.crew.indexOf(c)) % OFF_PAIRS.length];
-  return WEEKDAYS.map((_, i) => off.includes(i) ? OFF : c.shift);
+  const pair = OFF_PAIRS[(idx != null ? idx : G.crew.indexOf(c)) % OFF_PAIRS.length];
+  // days they can't work their usual shift are their days off (js/timeoff.js)
+  const bad = c.avail ? WEEKDAYS.map((_, i) => i).filter(i => !availOk(c, i, c.shift)) : [];
+  const off = bad.length >= 2 ? bad : bad.concat(pair.filter(i => !bad.includes(i))).slice(0, 2);
+  return WEEKDAYS.map((_, i) => off.includes(i) ? OFF : c.avail ? fitShift(c, i, c.shift) : c.shift);
 }
 // The schedule for a week. Missing weeks are built from last week (or usual shifts).
 function schedFor(w) {
@@ -75,6 +78,7 @@ function schedFor(w) {
   if (!s) {
     s = G.sched[w] = { posted: false, rows: {} };
     G.crew.forEach((c, i) => { s.rows[c.id] = prev && prev.rows[c.id] ? prev.rows[c.id].slice() : defaultRow(c, i); });
+    ptoApplyWeek(w, s);
   }
   G.crew.forEach((c, i) => { if (!s.rows[c.id]) s.rows[c.id] = defaultRow(c, i); });
   if (!s.rows[MGR]) s.rows[MGR] = prev && prev.rows[MGR] ? prev.rows[MGR].slice() : MGR_DEFAULT.slice();
@@ -260,7 +264,7 @@ function laborStartDay() {
   if (dow === 'Thu') {
     schedFor(w + 1);
     mail('District Manager', `Post week ${w + 1}'s schedule by ${fmtTime(SCHED_CUTOFF)}`,
-      `Next week's schedule posts today at ${fmtTime(SCHED_CUTOFF)}. Check it against your Labor Demand Exception report before you post (Office computer → Schedule and → Labor).\nAny row off by more than 2 hours or 10% is an exception you need to be able to explain.\nWhy post on time: people plan their lives around it. Changes after it's posted cost you trust.`);
+      `Next week's schedule posts today at ${fmtTime(SCHED_CUTOFF)}. Check it against your Labor Demand Exception report before you post (Office computer → Schedule and → Labor).\nAny row off by more than 2 hours or 10% is an exception you need to be able to explain.\nBefore you post: answer every time-off request for that week, and fix every red cell (someone scheduled outside their availability or on a day you approved off). They won't come in.\nWhy post on time: people plan their lives around it. Changes after it's posted cost you trust.`);
   }
 }
 function laborTick() {
