@@ -24,6 +24,7 @@ const GRIPE_TEXT = {
   writeup: 'That write-up felt unfair.',
   timeoff: 'I asked for a day off that mattered and didn\'t get it, or never even got an answer.',
   avail: 'I told you when I could work, and you kept scheduling me when I couldn\'t.',
+  review: 'My review was late, or it didn\'t match the work I actually did. The raise said the same thing.',
 };
 const FIX_TEXT = {
   schedule: 'Keep schedules steady. Change someone\'s shift only when you have to, and tell them why.',
@@ -36,6 +37,7 @@ const FIX_TEXT = {
   writeup: 'Write people up for real problems, and explain why. A write-up for a small thing feels like a grudge.',
   timeoff: 'Answer time-off requests fast, and say yes when you can cover it. Approved early, a day off is easy to schedule around.',
   avail: 'Schedule people inside their availability. The red cells on the schedule are shifts nobody will work.',
+  review: 'Do reviews on time, rate from the facts, and pay raises from the merit matrix.',
 };
 const LIKE_TEXT = {
   praised: 'You did notice my work. That meant something.',
@@ -44,6 +46,7 @@ const LIKE_TEXT = {
   fair: 'You handled the drama fairly.',
   heard: 'When I needed a day off, you made it work.',
   direction: 'Every morning I knew what mattered that day.',
+  raise: 'My review was fair, and the raise matched it.',
 };
 
 function ensureMorale(c) {
@@ -130,6 +133,7 @@ function startConflict(a, b, topic) {
   const tp = topic || pick(CONFLICT_TOPICS.filter(t => t.sev <= (a.trait === 'hothead' || a.morale < 35 ? 3 : 2)));
   const id = nid();
   G.conflict = { id, a: a.id, b: b.id, sev: tp.sev, text: tp.t(a.name, b.name), start: G.time };
+  a.fights = (a.fights || 0) + 1; // on file for their review (js/perf.js)
   G.today.conflicts = (G.today.conflicts || 0) + 1;
   const ra = rt(a), rb = rt(b);
   finishPlan(a, ra); finishPlan(b, rb);

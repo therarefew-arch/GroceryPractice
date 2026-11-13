@@ -32,6 +32,7 @@ const TASK_CHECK = {
   reset: a => { const rs = resetById(a.id); return !rs || rs.state === 'done'; },
   resetprep: () => true,
   pto: () => !ptoPending().length,
+  reviews: () => !reviewsDue().length,
   huddle: () => huddleHeld(),
   ecfill: () => MAPD.endcaps.every(e => !G.endcaps[e.id] || (ecStockOf(e.id) > 0 && !ecLow(e))),
   recallshelf: a => { const rs = recallById(a.id); return !rs || rs.shelfAt != null; },
@@ -80,6 +81,7 @@ function buildChecklist() {
   if (dow === 'Mon' && G.nextAd) add('adplan', 'adflip', 'Plan spots for tomorrow\'s ad chart', `New ad: ${G.nextAd.map(d => DEPT[d].name).join(' & ')}`, 1375, 'at');
   if (dow === 'Tue' && G.nextAd) add('adflip', 'adflip', 'Ad flip tonight', `Switch 2 endcaps each to ${G.nextAd.map(d => DEPT[d].name).join(' & ')} (from 6 PM, E at the endcap)`, 1375, 'at');
   if (mgrHuddleDay(G.day)) add('huddle', 'huddle', 'Morning huddle', 'Break room before 8 AM: yesterday, today, one priority, one shout-out', HUDDLE_TO, 'by');
+  if (reviewsDue().length) add('reviews', 'reviews', 'Performance reviews', `Due: ${reviewsDue().map(c => c.name).join(', ')} (Crew tab)`, 1380, 'by');
   if (ptoPending().length) add('pto', 'pto', 'Answer time-off requests', `${plural(ptoPending().length, 'request')} waiting (🗓 Schedule)`, 1020, 'at');
   if (MAPD.endcaps.some(e => G.endcaps[e.id])) add('ecfill', 'ecfill', 'Endcaps full', 'Every endcap display at least half full', 1020, 'at');
   if (dow === 'Wed' && G.ad) add('adverify', 'adverify', 'Verify the new ad', 'Ad endcaps up and those shelves 60%+ by noon', 720, 'at');
