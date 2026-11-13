@@ -8,7 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1380, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.28'; // bump the last number on every update
+const VERSION = '0.0.29'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -340,12 +340,13 @@ function endDay() {
   res.badges.forEach(b => { G.badges[b] = (G.badges[b] || 0) + 1; });
   G.bank += res.bonus;
   addXP(res.xp);
-  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res), ...laborDayExtras(), ...backroomDayExtras(), ...facingDayExtras(), ...countsDayExtras(), ...damagesDayExtras(), ...cutsDayExtras(), ...recallsDayExtras(), ...resetsDayExtras(), ...endcapsDayExtras(), ...timeoffDayExtras(), ...interviewDayExtras(), ...huddleDayExtras(), ...perfDayExtras(), ...custDayExtras(), ...weatherDayExtras() });
+  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res), ...laborDayExtras(), ...backroomDayExtras(), ...facingDayExtras(), ...countsDayExtras(), ...damagesDayExtras(), ...cutsDayExtras(), ...recallsDayExtras(), ...resetsDayExtras(), ...endcapsDayExtras(), ...timeoffDayExtras(), ...interviewDayExtras(), ...huddleDayExtras(), ...perfDayExtras(), ...custDayExtras(), ...weatherDayExtras(), ...pnlDayExtras() });
   if (G.pastDays.length > 30) G.pastDays.shift();
   updateRecords(G.pastDays[G.pastDays.length - 1]);
   if (dowOf(G.day) === 'Fri') {
     const rv = buildWeekReview(weekOf(G.day));
     if (rv) { G.reviews = (G.reviews || []).concat([rv]).slice(-12); G.pendingReview = rv; mail('District Manager', `Week ${rv.week} review: ${rv.grade}`, reviewText(rv)); }
+    buildPnl(weekOf(G.day));
   }
   G.lastResult = res;
   G.phase = 'summary';
