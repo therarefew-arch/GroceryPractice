@@ -18,7 +18,8 @@ const UI = {
       b.onclick = () => { const v = +b.dataset.speed; if (v === 0) RT.paused = !RT.paused; else setSpeed(v); b.blur(); };
     });
     $('btn-endnight').onclick = e => { e.target.blur(); confirmEndNight(); };
-    $('btn-pc').onclick = e => { e.target.blur(); toast('Walk to the computer in the OFFICE (top-right) and press E.', 'info'); };
+    $('btn-pc').onclick = e => { e.target.blur(); if (G && G.player.away) this.openComputer(); else toast('Walk to the computer in the OFFICE (top-right) and press E.', 'info'); };
+    $('btn-home').onclick = e => { e.target.blur(); if (G && !G.player.away && (G.phase === 'day' || G.phase === 'night')) askGoHome(); };
     $('pc-close').onclick = () => this.closeComputer();
     window.addEventListener('resize', fit);
     window.addEventListener('keydown', e => {
@@ -36,8 +37,13 @@ const UI = {
       if (e.code === 'Digit2') setSpeed(2);
       if (e.code === 'Digit3') setSpeed(4);
       if ((e.code === 'KeyE' || e.code === 'Space') && !isPaused() && !G.player.work) {
+        RT.holdT = 0;
         const it = getInteraction();
         if (it && it.fn) it.fn();
+      }
+      if (e.code === 'KeyQ' && !isPaused() && !G.player.work) {
+        const it = getInteraction();
+        if (it && it.alt && it.alt.fn) it.alt.fn();
       }
     });
     window.addEventListener('keyup', e => { RT.keys[e.code] = false; });
@@ -52,9 +58,14 @@ const UI = {
     if (p.work) { el.textContent = p.work.label + '…'; el.className = ''; }
     else {
       const it = isPaused() ? null : getInteraction();
-      if (it) { el.textContent = (it.fn ? (TOUCH ? '👆 ' : '[E] ') : '') + it.label; el.className = it.bad ? 'bad' : ''; }
+      RT.curIt = it;
+      RT.hl = it && it.fn && it.at ? it.at : null;
+      const alt = it && it.alt && it.alt.fn ? `${TOUCH ? ' · Q: ' : '   [Q] '}${it.alt.label}` : '';
+      if (it) { el.textContent = (it.fn ? (TOUCH ? '👆 ' : '[E] ') : '') + it.label + alt; el.className = it.bad ? 'bad' : ''; }
       else { el.textContent = this.hint(); el.className = 'hint'; }
     }
+    if (p.work) { RT.hl = null; RT.curIt = null; }
+    awayFrame();
     let hold = '';
     if (p.carry.length) hold = 'Holding: ' + p.carry.map(caseLabel).join(' · ');
     else if (p.floatId) { const f = floatById(p.floatId); if (f) hold = `Pushing ${DEPT[f.dept].aisle} ${DEPT[f.dept].name} float · ${plural(f.cases.length, 'case')}`; }
@@ -67,6 +78,7 @@ const UI = {
 
   hint() {
     if (RT.paused) return TOUCH ? 'Paused — tap ▶ to resume' : 'Paused — press P to resume';
+    if (G.player.away) return 'Off the clock. Your next shift: ' + nextShiftText() + '.';
     if (G.phase === 'night') return G.trailer.length ? 'Night: pull pallets off the trailer at the dock doors (top-left), or press "End night".' : 'Trailer empty! Break down pallets or press "End night" to start tomorrow.';
     if (G.phase === 'day' && G.time < OPEN) return 'Doors open at 7:00 AM — get freight on the shelves.';
     if (G.vendorsToday.some(v => v.state === 'waiting')) return 'A DSD vendor is waiting at the back door (green DSD door).';
@@ -97,6 +109,9 @@ const UI = {
       b.classList.toggle('on', v === 0 ? RT.paused : (!RT.paused && G.speed === v));
     });
     $('btn-endnight').classList.toggle('hidden', G.phase !== 'night');
+    $('btn-home').classList.toggle('hidden', G.player.away || (G.phase !== 'day' && G.phase !== 'night'));
+    const sk = mgrShift(G.day);
+    $('btn-home').title = G.player.away ? '' : sk ? `Your shift: ${SHIFTS[sk].name}. Click to clock out and go home.` : 'Your day off. Click to go home.';
   },
 
   // ---------------- computer ----------------
@@ -262,9 +277,15 @@ const UI = {
     const cw = weekOf(G.day), w = this.schedWeek === cw + 1 ? cw + 1 : cw;
     const s = schedFor(w), ws = weekStart(w), ti = w === cw ? dowIdx(G.day) : -1;
     let h = `<h2>🗓 Schedule</h2><div class="row">${[cw, cw + 1].map(x => `<button class="${x === w ? 'primary' : ''}" onclick="UI.schedWeek=${x};UI.render()">Week ${x} (${x === cw ? 'this week' : 'next week'})</button>`).join(' ')}</div>`;
-    h += `<p class="mute">Week ${w}: ${fmtMD(ws)} to ${fmtMD(ws + 6)} · ${s.posted ? `<span class="good">Posted${s.postedBy === 'auto' ? ' (auto-posted)' : ''}</span>. Changes now cost that person's morale.` : `<span class="warn">Not posted.</span> Post it by Thursday ${fmtTime(SCHED_CUTOFF)}; after that, every change costs morale.`} Paid hours = shift length minus a 1-hour unpaid lunch on shifts over 6 hours. Over 40 paid hours in a week is overtime (1.5x).</p>`;
+    h += `<p class="mute">Week ${w}: ${fmtMD(ws)} to ${fmtMD(ws + 6)} · ${s.posted ? `<span class="good">Posted${s.postedBy === 'auto' ? ' (auto-posted)' : ''}</span>. Changes now cost that person's morale.` : `<span class="warn">Not posted.</span> Post it by Thursday ${fmtTime(SCHED_CUTOFF)}; after that, every change costs morale.`} Paid hours = shift length minus a 1-hour unpaid lunch on shifts over 6 hours. Over 40 paid hours in a week is overtime (1.5x). <b>You</b> are on here too: you come in for your shifts, and the crew runs the store when you're off (store managers are salaried, so your shifts count in full).</p>`;
     const opt = (v, cur) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${v === OFF ? '— Off —' : SHIFTS[v].name}</option>`;
     h += `<div style="overflow-x:auto"><table style="font-size:15px"><tr><th>Name</th>${WEEKDAYS.map((d, i) => `<th${i === ti ? ' style="color:#fff3d6"' : ''}>${d} ${fmtMD(ws + i)}${i === ti ? ' ◀' : ''}</th>`).join('')}<th class="n">Hrs</th></tr>`;
+    {
+      const row = s.rows[MGR], hrs = mgrPaidMin(w) / 60, worked = ((G.mgrMin || {})[w] || 0) / 60;
+      h += `<tr style="background:#2a220855"><td style="white-space:nowrap"><span class="dot" style="background:#ffd34d"></span><b>You</b><div class="mute" style="font-size:12px">Store Manager · GR-Mgr${w === cw ? ` · worked ${worked.toFixed(1)} h` : ''}</div></td>` +
+        row.map((v, i) => `<td><select style="font-size:14px;max-width:118px${v === OFF ? ';color:#7a6a50' : ''}" ${i < ti ? 'disabled' : ''} onchange="UI.schedSet(${w},'mgr',${i},this.value)">${opt(OFF, v)}${Object.keys(SHIFTS).map(k => opt(k, v)).join('')}</select></td>`).join('') +
+        `<td class="n"><b>${hrs.toFixed(0)}</b></td></tr>`;
+    }
     for (const c of G.crew) {
       const row = s.rows[c.id], hrs = weekPaidMin(w, c) / 60;
       h += `<tr><td style="white-space:nowrap"><span class="dot" style="background:${ROLES[c.role].color}"></span>${esc(c.name)}<div class="mute" style="font-size:12px">${ROLES[c.role].name} · ${LD_ROWS.find(r => r.key === roleRow(c.role)).name}</div></td>` +
@@ -286,8 +307,8 @@ const UI = {
   },
   schedSet(w, id, i, v) { setSched(w, id, i, v); this.render(); },
   schedPost(w) { postSchedule(w); this.render(); },
-  schedCopy(w) { const src = schedFor(w - 1), dst = schedFor(w); if (dst.posted) return; G.crew.forEach(c => { if (src.rows[c.id]) dst.rows[c.id] = src.rows[c.id].slice(); }); this.render(); },
-  schedReset(w) { const dst = schedFor(w); if (dst.posted) return; G.crew.forEach((c, i) => { dst.rows[c.id] = defaultRow(c, i); }); this.render(); },
+  schedCopy(w) { const src = schedFor(w - 1), dst = schedFor(w); if (dst.posted) return; G.crew.forEach(c => { if (src.rows[c.id]) dst.rows[c.id] = src.rows[c.id].slice(); }); if (src.rows[MGR]) dst.rows[MGR] = src.rows[MGR].slice(); this.render(); },
+  schedReset(w) { const dst = schedFor(w); if (dst.posted) return; G.crew.forEach((c, i) => { dst.rows[c.id] = defaultRow(c, i); }); dst.rows[MGR] = MGR_DEFAULT.slice(); this.render(); },
   tab_labor() {
     const cw = weekOf(G.day), nf = G.fc && G.fc[cw + 1];
     let h = '<h2>📑 Labor</h2>';
@@ -487,13 +508,14 @@ const UI = {
   layReset() { this.ask('Reset the backroom?', 'Every float spot, reload staging and the baler go back to where they started.', 'Reset', () => { resetLayout(); this.laySel = null; if (this.open) this.render(); }, true); },
   tab_help() {
     return `<h2>Help & Settings</h2>
-      <h3>Controls</h3><p><kbd>WASD</kbd>/<kbd>Arrows</kbd> move · <kbd>Shift</kbd> run · <kbd>E</kbd>/<kbd>Space</kbd> interact · <kbd>P</kbd> pause · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> speed 1×/2×/4× · <kbd>Esc</kbd> leave the computer</p>
+      <h3>Controls</h3><p><kbd>WASD</kbd>/<kbd>Arrows</kbd> move · <kbd>Shift</kbd> run · <kbd>E</kbd>/<kbd>Space</kbd> interact (hold to repeat) · <kbd>Q</kbd> second action · <kbd>P</kbd> pause · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> speed 1×/2×/4× · <kbd>Esc</kbd> leave the computer</p>
       <h3>The daily loop</h3><ol>
       <li><b>5:00 AM</b> — Last night's truck is in Receiving. Break pallets down onto department floats (blue spots). You carry up to 3 cases.</li>
-      <li>Push a float to its aisle and work it onto the shelf. When the shelf is full, take the overflow to Backstock (racks, top middle).</li>
+      <li>Push a float to its aisle and work it onto the shelf. When the shelf is full, take the overflow to its aisle's <b>bird</b> in Backstock (top middle). Birds have wheels: push one out to its aisle and work it onto the shelf.</li>
       <li><b>7:00 AM</b> — Doors open. Every empty shelf is a lost sale and an unhappy customer.</li>
       <li>DSD vendors arrive at the green door and wait ${VENDOR_PATIENCE} minutes. Price tags: yellow = price change, red blinking = scan error.</li>
       <li>Cold (blue-outlined) pallets start spoiling at 9:00 AM if they're still in the back.</li>
+      <li><b>Your shift</b> — You're on the schedule (the You row). Before and after your shift the crew runs the store on its own and time moves fast. Log in from home with 🖥️ while you're away.</li>
       <li><b>10:00 PM</b> — Closing report. At night, pull pallets off the trailer into Receiving (or let overtime do it for a fee).</li></ol>
       <h3>Practice settings</h3>
       <label><input type="checkbox" ${RT.settings.labels ? 'checked' : ''} onchange="UI.setLabels(this.checked)"> Easy mode: show the aisle on case labels. Off by default, so you have to know where every item lives.</label>
@@ -510,11 +532,12 @@ const UI = {
     this.showModal(`<h2>🛒 Grocery Practice</h2>
       <p>You're running the store. Every night a truck comes in, and every morning that freight is waiting in <b>Receiving</b>. Get it sorted, worked to the shelf, and keep the store in stock without blowing the labor budget.</p>
       <h3>Your first morning</h3><ol>
-      <li>Walk to a pallet in the yellow <b>Receiving</b> area and press <kbd>E</kbd> to grab cases (up to 3).</li>
+      <li>Walk to a pallet in the yellow <b>Receiving</b> area and press <kbd>E</kbd> to grab cases (up to 3 at once; hold <kbd>E</kbd> to keep going).</li>
       <li>Sort each case onto its department's float (blue spots). Labels tell you the aisle.</li>
       <li>Push a float (<kbd>E</kbd>) to its aisle and press <kbd>E</kbd> at the shelf to work it.</li>
       <li>Visit the <b>office computer</b> (top-right) for reports, email, hiring, endcaps and tomorrow's order.</li></ol>
-      <p><kbd>WASD</kbd>/<kbd>Arrows</kbd> move · <kbd>Shift</kbd> run · <kbd>E</kbd> interact · <kbd>P</kbd> pause · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> speed</p>
+      <p><kbd>WASD</kbd>/<kbd>Arrows</kbd> move · <kbd>Shift</kbd> run · <kbd>E</kbd> interact · <kbd>Q</kbd> second action · <kbd>P</kbd> pause · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> speed</p>
+      <p class="mute">You're on the schedule: you open today (5 AM to 2 PM). When your shift ends you can go home and the crew runs the rest of the day.</p>
       <p class="mute">Tip: Dairy & Frozen pallets (blue outline) spoil if they sit. Work cold first.</p>
       <div class="row" style="justify-content:flex-end"><button class="primary" onclick="UI.hideModal()">Clock in for Day 1 →</button></div>`);
   },
@@ -523,9 +546,9 @@ const UI = {
       <div class="row" style="justify-content:flex-end"><button class="danger" onclick="UI.newGameConfirm()">Start over</button><button class="primary" onclick="UI.hideModal(); if (G.phase === 'summary') UI.showSummary(G.lastResult);">Continue</button></div>`);
   },
   // In-game yes/no box (the browser's confirm() pop-up is blocked in some embedded browsers).
-  ask(title, body, yes, onYes, danger) {
+  ask(title, body, yes, onYes, danger, no) {
     this._askYes = onYes;
-    this.showModal(`<h2>${esc(title)}</h2><p>${esc(body)}</p><div class="row" style="justify-content:flex-end;margin-top:12px"><button onclick="UI.hideModal()">Cancel</button><button class="${danger ? 'danger' : 'primary'}" onclick="UI.hideModal(); const f = UI._askYes; UI._askYes = null; if (f) f();">${esc(yes)}</button></div>`);
+    this.showModal(`<h2>${esc(title)}</h2><p>${esc(body)}</p><div class="row" style="justify-content:flex-end;margin-top:12px"><button onclick="UI.hideModal()">${esc(no || 'Cancel')}</button><button class="${danger ? 'danger' : 'primary'}" onclick="UI.hideModal(); const f = UI._askYes; UI._askYes = null; if (f) f();">${esc(yes)}</button></div>`);
   },
   newGameConfirm() {
     this.ask('Start a brand-new store?', 'Your saved progress will be erased. This can\'t be undone.', 'Start over', () => this.newGameNow(), true);
@@ -557,7 +580,7 @@ const UI = {
       <p class="mute">Best day: ${r.best.dow} (Day ${r.best.day}, ${r.best.grade}) · Worst day: ${r.worst.dow} (Day ${r.worst.day}, ${r.worst.grade})</p>`;
   },
   showWeekReview(r, thenNight) {
-    this.showModal(this.reviewHTML(r) + `<div class="row" style="justify-content:flex-end;margin-top:14px"><button class="primary" onclick="UI.hideModal();${thenNight ? ' startNight();' : ''}">${thenNight ? 'Got it. Clock in for tonight →' : 'Close'}</button></div>`);
+    this.showModal(this.reviewHTML(r) + `<div class="row" style="justify-content:flex-end;margin-top:14px"><button class="primary" onclick="UI.hideModal();${thenNight ? ' startNight();' : ''}">${thenNight ? (worksTonight() ? 'Got it. Clock in for tonight →' : 'Got it. Head home →') : 'Close'}</button></div>`);
   },
   showSummary(res) {
     const color = { A: '#3cc47c', B: '#7bd389', C: '#f0b429', D: '#f08a29', F: '#e5534b' }[res.grade];
@@ -568,7 +591,7 @@ const UI = {
       <h3>Rewards</h3><p>+${res.xp + res.earnedToday} XP today (${res.earnedToday} from your own work) · Manager bonus +${money(res.bonus)} → career bank ${money(G.bank)}</p>
       <div>${res.badges.map(b => `<span class="badge" title="${BADGES[b].desc}">🏅 ${BADGES[b].name}</span>`).join('') || '<span class="mute">No badges today.</span>'}</div>
       <h3>Coach's notes</h3><ul>${res.tips.map(t => `<li>${t}</li>`).join('')}</ul>
-      <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="primary" onclick="UI.afterSummary()">${G.pendingReview ? 'Read the DM\'s weekly review →' : 'Clock in for tonight\'s truck →'}</button></div>`);
+      <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="primary" onclick="UI.afterSummary()">${G.pendingReview ? 'Read the DM\'s weekly review →' : worksTonight() ? 'Clock in for tonight\'s truck →' : 'Head home for the night →'}</button></div>`);
   },
 };
 

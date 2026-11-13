@@ -146,3 +146,12 @@ body.touch .toast { font-size: 15px; padding: 4px 8px; }
   .modal-card { padding: 14px 16px; max-height: 94vh; width: calc(100% - 16px); }
   .pc-top { padding: 6px 10px; font-size: 11px; }
 }
+
+/* ---------- Off the clock (your shift) ---------- */
+#away { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 4; width: min(760px, 94%); pointer-events: auto; }
+.away-card { background: #120e08ee; border: 1px solid #ffd34d88; box-shadow: 0 0 18px #ffd34d33; border-radius: 6px; padding: 8px 12px; font-size: 17px; line-height: 1.25; }
+.away-card b { color: #ffe9a0; }
+.away-card .row { margin-top: 6px; gap: 8px; }
+#btn-home { padding: 2px 8px; }
+.tq { width: 58px; height: 58px; border-radius: 50%; font-size: 20px !important; background: #42d7ffcc !important; color: #001a22 !important; border: 2px solid #9be3ff !important; box-shadow: 0 0 12px #42d7ff66 !important; }
+body.touch .away-card { font-size: 14px; padding: 6px 8px; }

@@ -1,6 +1,6 @@
 # Grocery Practice
 
-**Version 0.0.14**
+**Version 0.0.15**
 
 A 2D grocery store manager simulator for practicing the real job: receiving the night truck, building floats, working freight, keeping the shelves full, running the crew, and ordering for tomorrow. All without blowing the labor budget.
 
@@ -11,9 +11,9 @@ It's plain HTML/JavaScript, so there's no build step.
 - **Locally:** serve the folder with any static server, e.g. `npx http-server -p 8123`, then open http://localhost:8123
 - **Online:** play it at https://therarefew-arch.github.io/GroceryPractice/ (GitHub Pages, updates with every push to main).
 
-**Controls:** `WASD`/arrows move · `Shift` run · `E`/`Space` interact · mouse wheel, `+`/`-` or `Z` zoom · `M` sound · `P` pause · `1` `2` `3` speed · `Esc` leave the computer
+**Controls:** `WASD`/arrows move · `Shift` run · `E`/`Space` interact (hold to repeat) · `Q` second action · mouse wheel, `+`/`-` or `Z` zoom · `M` sound · `P` pause · `1` `2` `3` speed · `Esc` leave the computer
 
-**Gamepad:** left stick/d-pad move · `A` interact · `B` or `RT` run · `LB`/`RB` zoom · `Start` pause
+**Gamepad:** left stick/d-pad move (the stick is analog) · `A` interact (hold to repeat) · `X` second action · `B` or `RT` run · `LB`/`RB` zoom · `Start` pause
 
 **Extras:** hover over a crew member to see what they are working on · chain sorts and stocks within 6 seconds for a combo XP bonus · a minimap appears while zoomed in · synth sound effects (mute with `M`) · confetti on level-ups and finishing the truck · rush-hour warning at 4 PM
 
@@ -22,7 +22,7 @@ It's plain HTML/JavaScript, so there's no build step.
 | Time | What happens |
 |---|---|
 | 5:00 AM | Last night's truck is in **Receiving**. Break mixed pallets down onto department **floats**. |
-| Morning | Push floats to their aisle and work them onto the shelf. Overflow goes to **Backstock**. |
+| Morning | Push floats to their aisle and work them onto the shelf. Overflow goes on that aisle's **bird** in Backstock. |
 | 7:00 AM | Doors open. Every empty shelf is a lost sale and an unhappy customer. |
 | All day | Check in **DSD vendors** at the back door, hang **price tags**, fix **scan errors**, fill holes. |
 | Office | The computer has **Reports, Email, Crew & Schedule, Hiring, Display Planner, Forecast & Order**. |
@@ -32,6 +32,8 @@ It's plain HTML/JavaScript, so there's no build step.
 **Weeks and trucks:** store weeks run Saturday to Friday (Day 1 is a Saturday). Weekends are busier, and forecasts use a day-of-week factor. Trucks come every night with different loads (`TRUCK_SCHEDULE`: Sat LV/Frozen/Dairy, Sun HV, Mon HV/Frozen/Dairy, Tue KeHe/LV/HV, Wed Dairy, Thu KeHe/LV/HV/Frozen/Dairy, Fri KeHe/HV). You can only order departments that are on tonight's trucks, and each order has to cover the days until that department's next truck. The order window closes at `ORDER_CUTOFF` (2:00 PM); miss it and the system order goes.
 
 **Daily checklist (📋):** the real floor-board routine, checked automatically: water and paper runs before open, backstock bird runs by day, closing last night's invoices, Monday ad planning, the Tuesday ad flip and Wednesday verify, Fri–Sun blitzes, the 6 PM dairy hole check, the 10–11 PM close run, a clean backroom, the out-of-stock count, and one stretch goal. Find it on the office computer → Today.
+
+**Your shift:** you're on the schedule too (the **You** row in 🗓 Schedule; by default you open 5a–2p, off Tuesday and Wednesday). You clock in when your shift starts. When it ends you're asked whether to go home; stay as long as you like, then use the 🏠 button or the staff door. While you're off the clock the crew runs the store on their own and time moves fast (an hour a second): watch, **Skip ahead**, **Come in now**, or **Log in from home** to use the computer (the order, forecast and schedule still have deadlines). The crew covers what can't wait for you: someone in the back checks in DSD vendors if there's no DSD Receiver, anyone cleans up a spill, someone pulls product from a failed cooler, and when their own work runs out they hang price tags, put away birds, fill holes, sweep and face. A ◆ Lead on shift settles arguments while you're gone; without one, nobody does. Store managers are salaried, so your shifts count in full on the GR-Mgr line of the Labor Demand report.
 
 **Shifts:** Open 5a–2p, Truck 6a/7a/8a, Mid 10a–7p, Close 2p–11p, Night 11p–5a. The store closes at 11 PM. Shifts over 6 hours take a 1-hour unpaid lunch break.
 
@@ -57,17 +59,21 @@ It's plain HTML/JavaScript, so there's no build step.
 
 **Labor (Monday forecast, schedule, Labor Demand Exception):** every Monday, forecast next week's sales by day before 5 PM (Office computer → 📑 Labor). The system forecast doesn't know about seasons or the ad, so adjust it. Your forecast earns next week's labor demand: truck cases, sales, DSD vendors, price tags and the ad flip, by role. Write next week's schedule day by day in 🗓 Schedule and post it by Thursday 5 PM; changes after posting cost morale. Everyone works 5 days by default; over 40 paid hours is overtime (1.5x). The Labor Demand Exception report shows demand vs scheduled hours by role and day (GR-Dairy, GR-DSD Receiving, GR-Frozen, GR-HV-LV-DSD, GR-HV-LV-DSD-RPLN, GR-Liquor, GR-Scan Price, then weekly-only roles), with exceptions in bold. The DM grades your forecast accuracy and your schedule against demand.
 
-**Backroom upkeep:** every broken-down pallet leaves an empty on its receiving spot: jack it (E) and stack it in RELOAD STAGING (bottom-left, 8 slots, 15 empties a stack). Every case leaves cardboard in the baler; when it's full, make a bale (E at the baler) or cardboard ends up on the floor. Trucks take reloads at night only if they have room: last stop on the route takes everything, a middle stop takes a little, the first stop takes nothing (the morning email tells you tonight's stops). Load reloads at the dock after the trailer is empty; a Night Unloader does it for you. Sweep the backroom mid-day and after 9 PM. Straighten crooked floats (they slow the breakdown). Each aisle's bird holds 14 cases of backstock; past that it overflows onto the sales floor, blocks the aisle and costs satisfaction every hour. Breakdown and Night Unloader crew stack empties, bale and sweep when they have nothing better to do.
+**Backroom upkeep:** every broken-down pallet leaves an empty on its receiving spot: jack it (E) and stack it in RELOAD STAGING (bottom-left, 8 slots, 15 empties a stack). Every case leaves cardboard in the baler; when it's full, make a bale (E at the baler) or cardboard ends up on the floor. Trucks take reloads at night only if they have room: last stop on the route takes everything, a middle stop takes a little, the first stop takes nothing (the morning email tells you tonight's stops). Load reloads at the dock after the trailer is empty; a Night Unloader does it for you. Sweep the backroom mid-day and after 9 PM. Straighten crooked floats (they slow the breakdown). Each aisle's bird holds 14 cases of backstock; past that it overflows onto the sales floor, blocks the aisle and costs satisfaction every hour.
+
+**Backstock birds (they have wheels):** each aisle's backstock lives on its bird, a 2-tier cart parked in BACKSTOCK (top middle). `E` at a bird pushes it; `Q` carries 3 cases instead. Push it to its own aisle and press `E` at the shelf to work backstock straight on, then park it back on its spot. A bird left on the sales floor counts as a blocked aisle until somebody puts it away (the crew does after 20 minutes). Replenishment, and Freight Pushers once the truck is out, run each aisle's bird on its backstock day; department clerks run their own. You can also order anyone to **Run the bird**. Breakdown and Night Unloader crew stack empties, bale and sweep when they have nothing better to do.
 
 **Backroom layout:** the store can't change shape, but you can rearrange the backroom (Office computer → 🧱 Backroom Layout). Move each department's float spot, reload staging (an 8×1 row or a 4×2 block) and the baler. Nothing can go on receiving, the dock, doorways or the backstock rack aisle, and there must be a path around everything. The tab shows walk distances (receiving → float → shelf, baler, reload staging, dock) against the original layout: shorter trips mean a faster truck.
 
-**On your phone:** open https://therarefew-arch.github.io/GroceryPractice/ and turn the phone sideways. On touch screens you get a joystick (left), a big **E** button, **RUN** (tap to toggle), zoom, pause and full screen. You can also tap the yellow action text at the bottom, and tap a crew member to see their card. To install it like an app: iPhone, Safari → Share → Add to Home Screen; Android, Chrome → ⋮ → Add to Home screen / Install app. It works offline after the first load. Your phone keeps its own save. Add `?touch=1` to the URL to force the touch controls on (or `?touch=0` to turn them off).
+**On your phone:** open https://therarefew-arch.github.io/GroceryPractice/ and turn the phone sideways. On touch screens you get an analog joystick (left; push further to go faster), a big **E** button (hold it to repeat), a blue **Q** button when there's a second action, **RUN** (tap to toggle), zoom, pause and full screen. You can also tap the yellow action text at the bottom, and tap a crew member to see their card. To install it like an app: iPhone, Safari → Share → Add to Home Screen; Android, Chrome → ⋮ → Add to Home screen / Install app. It works offline after the first load. Your phone keeps its own save. Add `?touch=1` to the URL to force the touch controls on (or `?touch=0` to turn them off).
 
-**Crew orders (micromanage):** click (or tap) an associate on the map, or use 📌 Orders in the Crew tab, and tell them exactly what to do: work the truck, break down pallets, unload the trailer, get one department's freight out, fill holes in a department, face an aisle, watch the back door for DSD, hang price tags, pick up cardboard or do backroom upkeep. They drop what they're doing, work the order until it's done or about 2 hours pass, then go back to their job. Orders outside their job (dashed buttons) work 15% slower unless they're a Lead or Superstar. More than 4 orders to one person in a day starts to cost morale: they want to finish something.
+**Crew orders (micromanage):** click (or tap) an associate on the map, or use 📌 Orders in the Crew tab, and tell them exactly what to do: work the truck, break down pallets, unload the trailer, get one department's freight out, fill holes in a department, run an aisle's bird, face an aisle, watch the back door for DSD, hang price tags, pick up cardboard or do backroom upkeep. They drop what they're doing, work the order until it's done or about 2 hours pass, then go back to their job. Orders outside their job (dashed buttons) work 15% slower unless they're a Lead or Superstar. More than 4 orders to one person in a day starts to cost morale: they want to finish something.
 
 **Weekly DM review:** after Friday's close (weeks run Saturday to Friday) your District Manager grades the week. He is harsh but fair: for every problem he tells you what he saw, why it matters and what to do next week. Reviews also land in your email and on the Records tab.
 
 **Records board:** Office computer → 🏆 Records tracks your personal bests (best score, top sales, fastest truck, lowest labor %, best in-stock, lowest OOS count, longest B-or-better streak, most coaching in a day).
+
+**Smoother handling:** you move and work at the game speed you pick (2× and 4× speed you up too). One `E` grabs up to 3 cases of the same department off a pallet; hold `E` to keep picking, sorting and stocking. Whatever `E` will act on gets yellow corner brackets, and the thing you're facing wins when two are close. You slide around wall corners instead of catching on them, and floats and birds trail smoothly in front of you.
 
 **Realism hooks:** cold pallets spoil if they sit in the back · forecasts use sales *plus* lost sales · endcaps lift demand and feed the forecast · vendors give up after 45 minutes · open price tags cause overcharges and complaints.
 
@@ -89,9 +95,11 @@ Everything store-specific lives in [`js/data.js`](js/data.js): departments/aisle
 | `js/events.js` | Special Item Requests, dated dairy, spills, coolers, DM walks, inspections, seasons |
 | `js/labor.js` | Weekly schedules, overtime, Monday forecast, labor demand, Labor Demand Exception report |
 | `js/backroom.js` | Empty pallets, baler & bales, reload staging, truck stop order, sweeping, crooked floats, bird overflow |
+| `js/birds.js` | Backstock birds on wheels: push them to the aisle, work them, crew bird runs, putting them away |
 | `js/layout.js` | Backroom layout: movable float spots, reload staging and baler, validation, walk distances |
 | `js/touch.js` | Phone/tablet joystick and buttons, home-screen app (with `sw.js`, `manifest.webmanifest`, `icons/`) |
 | `js/orders.js` | Crew orders: click/tap an associate to assign any task, even outside their job |
+| `js/shift.js` | Your own shift: clocking in and out, off-the-clock fast-forward, crew covering vendors, spills, coolers and idle work |
 | `js/review.js` | Weekly DM review, records board, gamepad |
 | `js/ui.js` | HUD, office computer, modals |
 

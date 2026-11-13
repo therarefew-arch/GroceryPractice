@@ -214,8 +214,8 @@ function drawBG() {
     g.strokeRect(s.x * T + 3, s.y * T + 3, T - 6, T - 6); g.restore();
     g.fillStyle = DEPT[s.dept].color; g.fillRect(s.x * T + 3, (s.y + 1) * T + 2, T - 6, 2);
   });
-  // Rack housings
-  for (const d of DEPTS) { const t = MAPD.rackTile[d.id]; housing(g, t.x * T, t.y * T, T, T); }
+  // Bird parking spots (the birds themselves move)
+  drawBirdSpots(g);
 
   // Zone nameplates
   nameplate(g, 'RECEIVING', 5 * T, 3.55 * T, { edge: PAL.amber, color: '#ffe2a6', font: PX(8) });
@@ -278,18 +278,15 @@ function drawShelves() {
   }
 }
 
-function drawRacks() {
-  for (const d of DEPTS) {
-    const t = MAPD.rackTile[d.id], px = t.x * T, py = t.y * T;
-    ctx.fillStyle = '#1a1e24'; ctx.fillRect(px + 4, py + 4, T - 8, T - 8);
-    ctx.fillStyle = '#5d646d'; ctx.fillRect(px + 4, py + 15, T - 8, 2);
-    const cs = Math.ceil(G.stock[d.id].back / d.upc);
-    for (let i = 0; i < Math.min(cs, 6); i++) {
-      const cx = i % 3, cy = (i / 3) | 0;
-      ctx.fillStyle = d.color; ctx.fillRect(px + 6 + cx * 7, py + 6 + cy * 11, 6, 8);
-    }
-    label(ctx, String(cs), px + T - 5, py + T - 5, { font: PX(8), outline: '#000' });
+// Pulsing corner brackets around whatever [E] will act on.
+function drawTarget() {
+  const t = RT.hl; if (!t) return;
+  const s = 15 + Math.sin(performance.now() / 160) * 1.5, x = t.x * T, y = t.y * T, L = 6;
+  ctx.save(); ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 2; ctx.shadowColor = '#ffd34d'; ctx.shadowBlur = 6;
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    ctx.beginPath(); ctx.moveTo(x + sx * s, y + sy * (s - L)); ctx.lineTo(x + sx * s, y + sy * s); ctx.lineTo(x + sx * (s - L), y + sy * s); ctx.stroke();
   }
+  ctx.restore();
 }
 
 function drawEndcaps() {
@@ -484,8 +481,9 @@ canvas.addEventListener('wheel', e => {
 }, { passive: false });
 
 function applyCamera() {
-  CAM.zoom += (CAM.target - CAM.zoom) * 0.2;
-  if (Math.abs(CAM.target - CAM.zoom) < 0.002) CAM.zoom = CAM.target;
+  const zt = G.player.away ? 1 : CAM.target;
+  CAM.zoom += (zt - CAM.zoom) * 0.2;
+  if (Math.abs(zt - CAM.zoom) < 0.002) CAM.zoom = zt;
   const z = CAM.zoom, W = MW * T, H = MH * T, vw = W / z, vh = H / z;
   const p = G.player;
   const cx = clamp(p.x * T - vw / 2, 0, W - vw), cy = clamp(p.y * T - vh / 2, 0, H - vh);
@@ -502,14 +500,15 @@ function render() {
   ctx.fillStyle = PAL.void; ctx.fillRect(0, 0, canvas.width, canvas.height);
   applyCamera();
   ctx.drawImage(BG, 0, 0);
-  drawShelves(); drawRacks(); drawEndcaps(); drawTags(); drawTrash(); drawEvents(); drawBackroom();
+  drawShelves(); drawEndcaps(); drawTags(); drawTrash(); drawEvents(); drawBackroom();
   if (G.phase === 'night') drawTrailer();
   G.pallets.forEach(p => drawPallet(p));
   G.floats.forEach(drawFloatMaybeCrooked);
+  drawBirds();
   RT.customers.forEach(drawCustomer);
   Object.values(RT.vendorNpcs).forEach(drawVendor);
   G.crew.forEach(c => { const r = RT.crew[c.id]; if (r && r.inBuilding) drawCrew(c, r); });
-  drawPlayer();
+  if (!G.player.away) { drawTarget(); drawPlayer(); }
   RT.floaters.forEach(f => {
     ctx.globalAlpha = clamp(1.4 - f.t, 0, 1);
     label(ctx, f.text, f.x * T, f.y * T, { font: PX(10), color: f.color, outline: 'rgba(0,0,0,0.9)' });

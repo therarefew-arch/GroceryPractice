@@ -30,6 +30,7 @@ function ensureBackroom() {
   G.reload = G.reload || { pallets: 0, bales: 0 };
   if (G.dirt == null) G.dirt = 10;
   G.floats.forEach(f => { if (f.crooked == null) f.crooked = false; });
+  ensureBirds();
 }
 const reloadUsed = () => Math.ceil(G.reload.pallets / STACK) + G.reload.bales;
 const reloadFree = () => RELOAD_SLOTS - reloadUsed();
@@ -122,6 +123,8 @@ const crookedFloats = () => G.floats.filter(f => !f.carriedBy && (f.crooked || M
 const birdCap = d => BIRD_CASES * DEPT[d].upc;
 const birdOver = d => !DEPT[d].cold && G.stock[d].back > birdCap(d);
 const birdsOver = () => DEPTS.filter(d => birdOver(d.id)).map(d => d.id);
+// Overflowing birds plus birds somebody left parked on the sales floor.
+const birdsOnFloor = () => [...new Set(birdsOver().concat(birdsLeftOut().map(b => b.dept)))];
 function birdSpot(d) {
   const g = GONDOLAS.find(([, ch]) => SHELF_DEPT[ch] === d);
   if (g) return { x: g[0] + 1.5, y: 12.5 };
@@ -183,7 +186,7 @@ function backroomHour() {
   if (G.phase !== 'day') return;
   G.dirt = Math.min(100, G.dirt + 1.5);
   G.floats.forEach(f => { if (!f.carriedBy && Math.random() < 0.06) f.crooked = true; });
-  const over = birdsOver();
+  const over = birdsOnFloor();
   if (G.time >= OPEN && over.length) {
     G.sat = Math.max(0, G.sat - 0.6 * over.length);
     G.today.birdHours = (G.today.birdHours || 0) + over.length;
@@ -195,7 +198,7 @@ function backroomStartDay() {
   planStops();
 }
 function backroomCheck() {
-  return { dirt: G.dirt, empties: G.empties.length, baler: G.baler >= BALE_SIZE, birds: birdsOver(), crooked: crookedFloats().length, reloadFull: reloadUsed() > RELOAD_SLOTS - 1 };
+  return { dirt: G.dirt, empties: G.empties.length, baler: G.baler >= BALE_SIZE, birds: birdsOnFloor(), crooked: crookedFloats().length, reloadFull: reloadUsed() > RELOAD_SLOTS - 1 };
 }
 function backroomTips() {
   const b = backroomCheck(), tips = [];

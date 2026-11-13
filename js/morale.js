@@ -139,11 +139,18 @@ function conflictTick(gm) {
   const [a, b] = conflictCrew();
   if (!a || !b || !onShift(a) || !onShift(b)) { G.conflict = null; return; }
   if (k.sev >= 2) G.sat = Math.max(0, G.sat - 0.02 * k.sev * gm);
+  // You're not here: a Lead on shift steps in.
+  const lead = G.player.away && G.time - k.start >= 10 && G.crew.find(c => c.lead && onShift(c) && c !== a && c !== b);
+  if (lead) {
+    G.conflict = null; G.lastConflictEnd = G.time; G.today.leadSettled = (G.today.leadSettled || 0) + 1;
+    toast(`◆ ${lead.name} (Lead) stepped in and settled it between ${a.name} and ${b.name}.`, 'good');
+    return;
+  }
   if (G.time - k.start >= CONFLICT_WINDOW) {
     bump(a, -6, 'conflict'); bump(b, -6, 'conflict'); teamBump(-2, 'conflict', null);
     G.today.conflictsIgnored = (G.today.conflictsIgnored || 0) + 1;
     G.conflict = null; G.lastConflictEnd = G.time;
-    toast(`😤 Nobody stepped in between ${a.name} and ${b.name}. The whole team noticed. (morale down)`, 'bad');
+    toast(`😤 Nobody stepped in between ${a.name} and ${b.name}. The whole team noticed. (morale down)${G.player.away ? ' Schedule a Lead for the hours you are off.' : ''}`, 'bad');
   }
 }
 function conflictInteraction(p) {

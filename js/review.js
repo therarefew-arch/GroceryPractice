@@ -160,9 +160,12 @@ function pollGamepad() {
   const k = RT.keys;
   k.PadLeft = ax < -0.4 || b(14); k.PadRight = ax > 0.4 || b(15); k.PadUp = ay < -0.4 || b(12); k.PadDown = ay > 0.4 || b(13);
   k.PadRun = b(1) || b(7);
+  k.PadA = b(0);
+  RT.padJoy = { x: ax, y: ay };
   const edge = i => b(i) && !PAD.prev[i];
   if (!RT.modal && !UI.open) {
-    if (edge(0) && !isPaused() && !G.player.work) { const it = getInteraction(); if (it && it.fn) it.fn(); }
+    if (edge(0) && !isPaused() && !G.player.work) { RT.holdT = 0; const it = getInteraction(); if (it && it.fn) it.fn(); }
+    if (edge(2) && !isPaused() && !G.player.work) { const it = getInteraction(); if (it && it.alt && it.alt.fn) it.alt.fn(); }
     if (edge(9)) RT.paused = !RT.paused;
     if (edge(5)) setZoom(CAM.target * 1.25);
     if (edge(4)) setZoom(CAM.target / 1.25);

@@ -15,8 +15,8 @@ GRIPE_TEXT.micro = 'I got pulled off my work every five minutes. I never got to 
 // What each job normally does (orders outside this list are "out of class").
 const ROLE_KINDS = {
   breakdown: ['truck', 'breakdown', 'freight', 'backroom', 'trash'],
-  freight: ['truck', 'freight', 'fill', 'trash'],
-  replen: ['fill', 'face', 'trash'],
+  freight: ['truck', 'freight', 'fill', 'bird', 'trash'],
+  replen: ['fill', 'bird', 'face', 'trash'],
   dsd: ['dsd', 'fill'],
   price: ['price', 'fill'],
   unloader: ['unload', 'truck', 'breakdown', 'backroom'],
@@ -27,6 +27,7 @@ const ORDERS = {
   unload: { name: 'Unload the trailer', desc: 'Pull pallets into receiving (night only)' },
   freight: { name: 'Get freight out', dept: true, desc: 'Break down and work this department\'s freight to the shelf' },
   fill: { name: 'Fill holes', dept: true, desc: 'Fill the shelf from backstock, then from that department\'s freight' },
+  bird: { name: 'Run the bird', dept: true, desc: 'Push this aisle\'s backstock bird out, work it onto the shelf, bring it back' },
   face: { name: 'Face the aisle', dept: true, desc: 'Pull product forward so the shelf looks full' },
   dsd: { name: 'Watch the back door', desc: 'Check in DSD vendors as they arrive' },
   price: { name: 'Hang price tags', desc: 'Hang tags and fix scan errors' },
@@ -35,7 +36,7 @@ const ORDERS = {
 };
 function inClass(c, kind, dept) {
   const rd = ROLES[c.role].dept;
-  if (rd) return ['freight', 'fill', 'face'].includes(kind) ? dept === rd : kind === 'truck';
+  if (rd) return ['freight', 'fill', 'bird', 'face'].includes(kind) ? dept === rd : kind === 'truck';
   return (ROLE_KINDS[c.role] || []).includes(kind);
 }
 const orderLabel = o => ORDERS[o.kind].name + (o.dept ? ': ' + DEPT[o.dept].name : '');
@@ -72,6 +73,7 @@ function orderPlan(c, r) {
     case 'freight': p = planFreight(c, r, D, 1) || planBreakdown(c, r, D); break;
     case 'fill': p = shelfPct(o.dept) >= 0.98 ? null : (planReplen(c, r, D, 0.98) || planFreight(c, r, D, 1) || planBreakdown(c, r, D)); break;
     case 'face': p = planFace(c, r, o.dept); break;
+    case 'bird': p = planBirdRun(c, r, o.dept); break;
     case 'price': p = planPrice(c, r); break;
     case 'trash': p = planTrash(c, r); break;
     case 'backroom': p = planBackroomForced(c, r); break;
@@ -135,6 +137,7 @@ function showOrders(c) {
   h += `<div style="margin:6px 0"><b>Freight</b><div>${btn('truck')}${btn('breakdown', null, `${G.pallets.length} pallets`)}${G.phase === 'night' ? btn('unload', null, `${G.trailer.length} on trailer`) : ''}</div></div>`;
   h += deptRow('freight', d => { const n = palletCases(d) + (floatOf(d) ? floatOf(d).cases.length : 0); return n ? n + ' cs' : '—'; });
   h += deptRow('fill', d => `${Math.round(shelfPct(d) * 100)}%`);
+  h += deptRow('bird', d => `${backCases(d)} cs`);
   h += deptRow('face', () => '');
   h += `<div style="margin:6px 0"><b>Other</b><div>${btn('dsd', null, waiting ? `${waiting} waiting` : '')}${btn('price', null, `${G.tags.length} tags`)}${btn('trash', null, `${trashN}`)}${btn('backroom', null, `dirt ${Math.round(G.dirt || 0)}%`)}</div></div>`;
   h += `<div class="row" style="justify-content:flex-end;margin-top:10px"><button class="primary" onclick="UI.hideModal()">Done</button></div>`;
@@ -145,5 +148,6 @@ function showOrders(c) {
 canvas.addEventListener('click', () => {
   if (!G || RT.modal || UI.open || (G.phase !== 'day' && G.phase !== 'night')) return;
   const c = crewAtMouse();
+  if (c && G.player.away) { toast('You\'re off the clock. Come in to give orders.', 'info'); return; }
   if (c) showOrders(c);
 });

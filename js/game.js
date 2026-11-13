@@ -8,7 +8,7 @@ const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1380, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.14'; // bump the last number on every update
+const VERSION = '0.0.15'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -194,7 +194,7 @@ function newGame() {
     stock: {}, pallets: [], trailer: [], floats: [], crew: [], candidates: [], emails: [], endcaps: {},
     history: {}, itemHistory: {}, order: null, orderSubmitted: false, tags: [], vendorsToday: [], badges: {},
     ad: null, today: null, lastResult: null, pastDays: [], nightLabor: 0, overtime: 0, nightPallets: 0,
-    player: { x: 30.5, y: 6.5, fx: 0, fy: 1, carry: [], floatId: null, pallet: null, work: null },
+    player: { x: 30.5, y: 6.5, fx: 0, fy: 1, carry: [], floatId: null, birdId: null, pallet: null, work: null, away: false },
   };
   applyCatalog();
   DEPTS.forEach(d => {
@@ -272,6 +272,7 @@ function startDay() {
   eventsStartDay();
   backroomStartDay();
   G.list = buildChecklist();
+  shiftStartDay();
   const nt = nextTruckDay(G.day);
   mail('District Manager', `${WEEKDAY_NAMES[dowIdx(G.day)]} game plan (${dayLabel(G.day)})`, [
     `Morning! It's ${WEEKDAY_NAMES[dowIdx(G.day)]}, week ${weekOf(G.day)}. Here's today:`,
@@ -390,11 +391,12 @@ function startNight() {
     toast(`No truck tonight. Next truck: ${WEEKDAY_NAMES[dowIdx(nextTruckDay(G.day + 1))]} night. Press "End night" when you're ready.`, 'info');
   }
   G.orderSubmitted = true; G.orderLocked = true;
+  shiftStartNight();
   save();
 }
 
 function endNight() {
-  if (G.player.pallet) { placePallet(G.player.pallet, freeRecvSpot(G.player)); G.player.pallet = null; }
+  if (G.player.pallet) { if (G.player.pallet.empty) G.empties.push({ id: G.player.pallet.id, x: G.player.x, y: G.player.y }); else placePallet(G.player.pallet, freeRecvSpot(G.player)); G.player.pallet = null; }
   G.player.work = null;
   G.crew.forEach(despawnCrew);
   if (G.trailer.length) {
@@ -427,6 +429,7 @@ function update(dt) {
   const gm = dt * (night ? 3 : 1);   // game minutes this step
   const prev = G.time;
   G.time += gm;
+  mgrTick(gm);
   if (!night) {
     if (G.time >= CLOSE) { G.time = CLOSE; endDay(); return; }
     if (Math.floor(G.time / 60) !== Math.floor(prev / 60)) onHour(Math.floor(G.time / 60));
@@ -651,6 +654,7 @@ function finishPlan(c, r) {
     if (f) { f.carriedBy = null; if (f.claimedBy === c.id) f.claimedBy = null; }
     r.floatId = null;
   }
+  if (r.birdId) { const b = G.birds[r.birdId]; if (b && b.carriedBy === c.id) { b.carriedBy = null; b.leftAt = G.time; b.leftDay = G.day; } if (b && b.claimedBy === c.id) b.claimedBy = null; r.birdId = null; }
   if (r.carry.length) { r.carry.forEach(cs => { G.stock[cs.d].back += caseUnits(cs); }); r.carry = []; }
   if (r.pallet && r.pallet.empty) { G.empties.push({ id: r.pallet.id, x: r.x, y: r.y }); r.pallet = null; }
   if (r.pallet) {
@@ -779,7 +783,7 @@ function planFreight(c, r, only, readyMin) {
       return false;
     } },
     { do: () => { if (rollMistake(c, 'stock', 0.12)) dropTrash(r); return true; } },
-    { do: () => (f.cases.length ? [{ go: () => [rackAccess(dept)] }, { wait: 1.2, label: 'Backstocking overflow' }, { do: () => { floatToBack(f); return true; } }] : true) },
+    { do: () => (f.cases.length ? [goEnt(() => birdOf(dept)), { wait: 1.2, label: 'Backstocking overflow' }, { do: () => { floatToBack(f); return true; } }] : true) },
     { go: () => tilesAround({ x: f.homeX, y: f.homeY }, 1).filter(tl => !(tl.x === Math.floor(f.homeX) && tl.y === Math.floor(f.homeY))) },
     { do: () => { f.carriedBy = null; r.floatId = null; f.x = f.homeX; f.y = f.homeY; f.claimedBy = null; knockFloat(f, c); return true; } },
   ];
@@ -794,7 +798,7 @@ function planReplen(c, r, only, threshold) {
   r.intent = `Filling holes in ${d.name}`;
   let t = 0;
   return [
-    { go: () => [rackAccess(dept)] },
+    goEnt(() => birdOf(dept)),
     { wait: 1.0, label: 'Pulling backstock' },
     { do: () => {
       const s = G.stock[dept];
@@ -890,14 +894,15 @@ function brain(c, r) {
   const role = ROLES[c.role];
   switch (c.role) {
     case 'breakdown': return (backroomUrgent() ? planBackroom(c, r) : null) || planBreakdown(c, r) || planBackroom(c, r) || planFreight(c, r, null, 30) || planReplen(c, r, null, 0.5);
-    case 'freight': return planFreight(c, r, null, 20) || planReplen(c, r, null, 0.6) || planBreakdown(c, r);
-    case 'replen': return planReplen(c, r, null, 0.75) || planFreight(c, r, null, 25);
+    case 'freight': return planFreight(c, r, null, 20) || planBirdRunToday(c, r) || planReplen(c, r, null, 0.6) || planBreakdown(c, r);
+    case 'replen': return planBirdRunToday(c, r) || planReplen(c, r, null, 0.75) || planFreight(c, r, null, 25);
     case 'dsd': return planDSD(c, r) || planReplen(c, r, null, 0.6);
     case 'price': return planPrice(c, r) || planReplen(c, r, null, 0.5);
     case 'unloader': return planUnload(c, r) || (backroomUrgent() ? planBackroom(c, r) : null) || planBreakdown(c, r) || planBackroom(c, r) || planFreight(c, r, null, 20);
     default: {
       const D = [role.dept];
-      return planReplen(c, r, D, 0.85) || planFreight(c, r, D, 6) || planBreakdown(c, r, D) || planFace(c, r, role.dept);
+      return planReplen(c, r, D, 0.85) || planFreight(c, r, D, 6) || planBreakdown(c, r, D) ||
+        (backCases(role.dept) >= 3 && shelfPct(role.dept) < 0.95 ? planBirdRun(c, r, role.dept) : null) || planFace(c, r, role.dept);
     }
   }
 }
@@ -912,6 +917,7 @@ function updateCrew(dt, gm) {
       if (on) { r.inBuilding = true; r.x = MAPD.staffDoor.x + 0.5; r.y = MAPD.staffDoor.y + 0.5; }
       continue;
     }
+    if (r.plan && on && !r.onBreak && !(r.hold > 0) && r.intent !== 'Going on lunch break' && coverNeeded(c)) finishPlan(c, r);
     const shf = SHIFTS[curShift(c)], slen = shf ? shf.end - shf.start : 0;
     if (on && !r.plan && slen > 360 && c.breakDay !== G.day && G.phase === 'day' && G.time >= shf.start + slen / 2 - 30) {
       c.breakDay = G.day; r.intent = 'Going on lunch break';
@@ -925,10 +931,11 @@ function updateCrew(dt, gm) {
     if (!r.plan) {
       if (!on) { r.intent = 'Clocking out'; r.plan = [{ go: () => [MAPD.staffDoor] }, { do: () => { r.inBuilding = false; return true; } }]; }
       else if (G.phase === 'day' && rollMistake(c, 'focus', 0.025)) { r.plan = [{ wait: 6, label: 'On their phone' }]; r.intent = 'On their phone 📱'; }
-      else r.plan = orderPlan(c, r) || brain(c, r) || planIdle(c, r);
+      else r.plan = orderPlan(c, r) || coverPlan(c, r) || brain(c, r) || helpPlan(c, r) || planIdle(c, r);
     }
     runPlan(c, r, dt);
     if (r.floatId) { const f = floatById(r.floatId); if (f) { f.x = r.x + r.fx * 0.6; f.y = r.y + r.fy * 0.6; } }
+    if (r.birdId) { const b = G.birds[r.birdId]; if (b && b.carriedBy === c.id) { b.x = r.x + r.fx * 0.6; b.y = r.y + r.fy * 0.6; } }
   }
 }
 
@@ -943,14 +950,17 @@ function updatePlayer(dt) {
   const p = G.player, k = RT.keys;
   let dx = ((k.ArrowRight || k.KeyD || k.PadRight || k.TouchRight) ? 1 : 0) - ((k.ArrowLeft || k.KeyA || k.PadLeft || k.TouchLeft) ? 1 : 0);
   let dy = ((k.ArrowDown || k.KeyS || k.PadDown || k.TouchDown) ? 1 : 0) - ((k.ArrowUp || k.KeyW || k.PadUp || k.TouchUp) ? 1 : 0);
+  let mag = 1;
+  // Analog stick (phone joystick or gamepad): any direction, push further to go faster.
+  const joy = [RT.touchJoy, RT.padJoy].find(j => j && Math.hypot(j.x, j.y) > 0.2), jm = joy ? Math.hypot(joy.x, joy.y) : 0;
+  if (jm > 0.2) { dx = joy.x; dy = joy.y; mag = Math.min(1, jm * 1.3); }
   if (dx || dy) {
     p.work = null;
     const l = Math.hypot(dx, dy); dx /= l; dy /= l;
     p.fx = dx; p.fy = dy;
     let sp = (k.ShiftLeft || k.ShiftRight || k.PadRun || k.TouchRun) ? 6.5 : 4.2;
-    if (p.floatId || p.pallet) sp *= 0.75;
-    if (!blockedAt(p.x + dx * sp * dt, p.y, 0.3)) p.x += dx * sp * dt;
-    if (!blockedAt(p.x, p.y + dy * sp * dt, 0.3)) p.y += dy * sp * dt;
+    if (p.floatId || p.pallet || p.birdId) sp *= 0.75;
+    movePlayer(p, dx * sp * mag * dt, dy * sp * mag * dt);
   }
   if (p.work) {
     p.work.t += dt;
@@ -959,7 +969,34 @@ function updatePlayer(dt) {
       if (w.repeat && cont) w.t = 0; else if (p.work === w) p.work = null;
     }
   }
-  if (p.floatId) { const f = floatById(p.floatId); if (f) { f.x = p.x + p.fx * 0.7; f.y = p.y + p.fy * 0.7; } else p.floatId = null; }
+  // Whatever you're pushing trails smoothly in front of you.
+  const follow = e => { const a = Math.min(1, dt * 18); e.x += (p.x + p.fx * 0.7 - e.x) * a; e.y += (p.y + p.fy * 0.7 - e.y) * a; };
+  if (p.floatId) { const f = floatById(p.floatId); if (f) follow(f); else p.floatId = null; }
+  if (p.birdId) { const b = G.birds && G.birds[p.birdId]; if (b && b.carriedBy === 'player') follow(b); else p.birdId = null; }
+}
+// Move with wall sliding. If a wall corner catches you while you walk straight,
+// ease around it toward whichever side is open.
+function movePlayer(p, mx, my) {
+  const R = 0.3;
+  const side = free => { for (const o of [0.12, 0.24, 0.36, 0.48]) { const a = free(o), b = free(-o); if (a !== b) return a ? 1 : -1; if (a) return 0; } return 0; };
+  if (mx) {
+    if (!blockedAt(p.x + mx, p.y, R)) p.x += mx;
+    else if (!my) { const s = side(o => !blockedAt(p.x + mx, p.y + o, R)); if (s && !blockedAt(p.x, p.y + s * Math.abs(mx), R)) p.y += s * Math.abs(mx); }
+  }
+  if (my) {
+    if (!blockedAt(p.x, p.y + my, R)) p.y += my;
+    else if (!mx) { const s = side(o => !blockedAt(p.x + o, p.y + my, R)); if (s && !blockedAt(p.x + s * Math.abs(my), p.y, R)) p.x += s * Math.abs(my); }
+  }
+}
+// Hold E (or the E button) to keep doing repeatable things: picking cases, sorting, stocking.
+function holdRepeat(dt) {
+  const k = RT.keys, p = G.player;
+  if (!(k.KeyE || k.Space || k.PadA || k.TouchE) || p.work || p.away) { RT.holdT = 0; return; }
+  RT.holdT = (RT.holdT || 0) + dt;
+  if (RT.holdT < 0.32) return;
+  RT.holdT = 0.16;
+  const it = getInteraction();
+  if (it && it.fn && it.rep) it.fn();
 }
 
 function nearestTile(p, test, r) {
@@ -974,25 +1011,36 @@ function nearestTile(p, test, r) {
   }
   return best;
 }
+// Closest thing within r. Things in front of you win ties over things behind you.
 function nearest(list, p, r, filter) {
-  let best = null, bd = r;
-  for (const e of list) { if (filter && !filter(e)) continue; const d = dist(e, p); if (d <= bd) { bd = d; best = e; } }
+  let best = null, bs = Infinity;
+  for (const e of list) {
+    if (filter && !filter(e)) continue;
+    const d = dist(e, p); if (d > r) continue;
+    const face = p.fx != null && d > 0.01 ? ((e.x - p.x) * p.fx + (e.y - p.y) * p.fy) / d : 0;
+    const s = d - 0.45 * face;
+    if (s < bs) { bs = s; best = e; }
+  }
   return best;
 }
+const tileC = t => (t ? { x: t.x + 0.5, y: t.y + 0.5 } : null);
 const inRecv = p => p.x >= 1 && p.x < 9 && p.y >= 4 && p.y < 9;
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const caseLabel = c => (RT.settings.labels && c.item !== 'Backstock' ? `${c.item} [${DEPT[c.d].aisle}]` : c.item === 'Backstock' ? `Backstock ${DEPT[c.d].name}` : c.item);
 function startWork(dur, label, done, repeat) { G.player.work = { t: 0, dur, label, done, repeat: !!repeat }; }
 
 // Context-sensitive [E] action for wherever the player is standing.
+// Returns { label, fn, at, rep, alt }: `at` is what gets the highlight, `rep` means
+// holding E repeats it, `alt` is the second action on [Q].
 function getInteraction() {
   const p = G.player;
   if (G.phase !== 'day' && G.phase !== 'night') return null;
+  if (p.away) return null;
   if (p.pallet && p.pallet.empty) return backroomInteraction(p);
-  const shelf = nearestTile(p, ch => !!SHELF_DEPT[ch], 1.3);
+  const pushing = p.floatId || p.birdId;
+  const shelf = nearestTile(p, ch => !!SHELF_DEPT[ch], pushing ? 1.75 : 1.3);
   const shelfDept = shelf ? SHELF_DEPT[shelf.ch] : null;
-  const rack = nearestTile(p, ch => ch === 'b', 1.35);
-  const rackDept = rack ? MAPD.rackDept[rack.x + ',' + rack.y] : null;
+  const bird = nearest(birdList(), p, 1.45, b => !b.carriedBy);
 
   if (p.pallet) {
     if (inRecv(p)) return { label: 'Drop pallet in Receiving', fn: playerDropPallet };
@@ -1000,62 +1048,84 @@ function getInteraction() {
   }
   if (p.floatId) {
     const f = floatById(p.floatId), n = f.cases.length, d = DEPT[f.dept];
-    if (shelfDept === f.dept && n) return { label: `Work ${plural(n, 'case')} onto ${d.name}`, fn: () => playerWorkFloat(f) };
+    if (shelfDept === f.dept && n) return { label: `Work ${plural(n, 'case')} onto ${d.name}`, fn: () => playerWorkFloat(f), at: tileC(shelf) };
     if (shelfDept && shelfDept !== f.dept && n) return { label: `✗ This is ${DEPT[shelfDept].name} — your float is ${d.name} (${d.aisle})`, fn: null, bad: true };
-    if (rackDept && n) return { label: `Backstock ${plural(n, 'overflow case')}`, fn: () => { floatToBack(f); toast(`Overflow from the ${d.name} float went to backstock.`); } };
-    if (Math.hypot(p.x - f.homeX, p.y - f.homeY) < 1.6) return { label: 'Park float at its home spot', fn: () => releaseFloat(true) };
+    const own = nearest(birdList(), p, 1.7, b => b.dept === f.dept && !b.carriedBy);
+    if (own && n) return { label: `Backstock ${plural(n, 'overflow case')} on the ${d.aisle} bird`, fn: () => { floatToBack(f); toast(`Overflow from the ${d.name} float went on its bird.`); }, at: own };
+    if (Math.hypot(p.x - f.homeX, p.y - f.homeY) < 1.6) return { label: 'Park float at its home spot', fn: () => releaseFloat(true), at: { x: f.homeX, y: f.homeY } };
     return { label: 'Let go of the float', fn: () => releaseFloat(false) };
+  }
+  if (p.birdId) {
+    const b = G.birds[p.birdId], d = DEPT[b.dept], n = backCases(b.dept);
+    if (shelfDept === b.dept && n) return canStock(b.dept) ? { label: `Work backstock onto ${d.name} (${plural(n, 'case')} on the bird)`, fn: () => playerWorkBird(b), at: tileC(shelf) } : { label: `${d.name} shelf is full`, fn: null };
+    if (shelfDept && shelfDept !== b.dept) return { label: `✗ This is ${DEPT[shelfDept].name}: your bird is ${d.name} (${d.aisle})`, fn: null, bad: true };
+    if (Math.hypot(p.x - b.homeX, p.y - b.homeY) < 1.6) return { label: 'Park the bird at its spot in BACKSTOCK', fn: () => releaseBird(true), at: { x: b.homeX, y: b.homeY } };
+    return { label: `Let go of the ${d.aisle} bird${n ? '' : ' (empty)'}`, fn: () => releaseBird(false) };
   }
   const cf = !p.work && conflictInteraction(p);
   if (cf) return cf;
   const ev = !p.work && eventsInteraction(p, shelfDept, true);
   if (ev) return ev;
   const coachee = G.crew.find(c => c.needsCoach && RT.crew[c.id] && RT.crew[c.id].inBuilding && dist(RT.crew[c.id], p) < 1.5);
-  if (coachee && !p.work) return { label: `Coach ${coachee.name}: ${TRAIN_AREAS[coachee.needsCoach.area].mistake}`, fn: () => { const rr = RT.crew[coachee.id]; if (rr) rr.hold = 2.5; startWork(2.5, 'Coaching', () => coachCrew(coachee)); } };
-  const trash = (G.trash || []).find(t => dist(t, p) < 1.1);
-  if (trash) return { label: 'Pick up the cardboard', fn: () => pickUpTrash(trash) };
-  const pal = nearest(G.pallets, p, 1.15);
-  const fl = nearest(G.floats, p, 1.2, f => !f.carriedBy);
+  if (coachee && !p.work) return { label: `Coach ${coachee.name}: ${TRAIN_AREAS[coachee.needsCoach.area].mistake}`, fn: () => { const rr = RT.crew[coachee.id]; if (rr) rr.hold = 2.5; startWork(2.5, 'Coaching', () => coachCrew(coachee)); }, at: RT.crew[coachee.id] };
+  const trash = nearest(G.trash || [], p, 1.3);
+  if (trash) return { label: 'Pick up the cardboard', fn: () => pickUpTrash(trash), at: trash, rep: true };
+  const pal = nearest(G.pallets, p, 1.35);
+  const fl = nearest(G.floats, p, 1.4, f => !f.carriedBy);
   if (p.carry.length) {
-    if (fl) { const m = p.carry.filter(c => c.d === fl.dept).length; if (m) return { label: `Sort ${plural(m, 'case')} onto the ${DEPT[fl.dept].name} float`, fn: () => playerSort(fl) }; }
-    if (shelfDept) { const m = p.carry.filter(c => c.d === shelfDept).length; if (m) return { label: `Stock ${plural(m, 'case')} on the shelf`, fn: () => playerStockCarry(shelfDept) }; }
-    if (rack) return { label: `Put ${plural(p.carry.length, 'case')} in backstock`, fn: playerCarryToBack };
-    if (pal && p.carry.length < CARRY_CAP) return { label: `Pick up another case (${pal.cases.length} on pallet)`, fn: () => playerPick(pal) };
+    if (fl) { const m = p.carry.filter(c => c.d === fl.dept).length; if (m) return { label: `Sort ${plural(m, 'case')} onto the ${DEPT[fl.dept].name} float`, fn: () => playerSort(fl), at: fl, rep: true }; }
+    if (shelfDept) { const m = p.carry.filter(c => c.d === shelfDept).length; if (m) return { label: `Stock ${plural(m, 'case')} on the shelf`, fn: () => playerStockCarry(shelfDept), at: tileC(shelf), rep: true }; }
+    if (bird) { const m = p.carry.filter(c => c.d === bird.dept).length; if (m) return { label: `Put ${plural(m, 'case')} on the ${DEPT[bird.dept].aisle} bird`, fn: () => playerCarryToBird(bird), at: bird, rep: true }; }
+    if (pal && p.carry.length < CARRY_CAP) return { label: `Pick up more (${pal.cases.length} on pallet)`, fn: () => playerPick(pal), at: pal, rep: true };
     if (fl) return { label: `✗ None of your cases go on the ${DEPT[fl.dept].name} float`, fn: () => wrongFloat(fl), bad: true };
+    if (bird) return { label: `✗ None of your cases go on the ${DEPT[bird.dept].aisle} bird (${DEPT[bird.dept].name})`, fn: null, bad: true };
     return null;
   }
-  if (nearestTile(p, ch => ch === 'C', 1.6)) return { label: 'Use the computer (reports, email, hiring, ordering…)', fn: () => UI.openComputer() };
+  const pc = nearestTile(p, ch => ch === 'C', 1.6);
+  if (pc) return { label: 'Use the computer (reports, email, hiring, ordering…)', fn: () => UI.openComputer(), at: tileC(pc) };
   const vend = G.vendorsToday.find(v => v.state === 'waiting' && RT.vendorNpcs[v.name] && dist(RT.vendorNpcs[v.name], p) < 1.6);
-  if (vend) return { label: `Check in ${vend.name} (${vend.cases} cs ${DEPT[vend.dept].name})`, fn: () => startWork(2, 'Checking in vendor', () => { if (vend.state === 'waiting') checkInVendor(vend, true); }) };
+  if (vend) return { label: `Check in ${vend.name} (${vend.cases} cs ${DEPT[vend.dept].name})`, fn: () => startWork(2, 'Checking in vendor', () => { if (vend.state === 'waiting') checkInVendor(vend, true); }), at: RT.vendorNpcs[vend.name] };
   if (G.phase === 'night' && G.trailer.length && p.y < 4.4 && p.x > 1.5 && p.x < 6.5) {
     return { label: `Pull a pallet off the trailer (${G.trailer.length} left)`, fn: () => startWork(1, 'Jacking pallet', () => { const pl = G.trailer.shift(); if (pl) G.player.pallet = pl; }) };
   }
   const br = !p.work && backroomInteraction(p);
   if (br) return br;
-  const tag = G.tags.find(t => Math.hypot(t.x + 0.5 - p.x, t.y + 0.5 - p.y) < 1.5);
-  if (tag) return { label: tag.kind === 'error' ? 'Fix scan error (shelf price ≠ register)' : 'Hang price change tag', fn: () => startWork(1.5, tag.kind === 'error' ? 'Fixing scan error' : 'Hanging tag', () => { if (G.tags.includes(tag)) fixTag(tag, true); }) };
-  if (pal) return { label: `Pick up a case (${pal.cases.length} on pallet)`, fn: () => playerPick(pal) };
+  const tag = nearest(G.tags.map(t => ({ x: t.x + 0.5, y: t.y + 0.5, t })), p, 1.5);
+  if (tag) { const t = tag.t; return { label: t.kind === 'error' ? 'Fix scan error (shelf price ≠ register)' : 'Hang price change tag', fn: () => startWork(1.5, t.kind === 'error' ? 'Fixing scan error' : 'Hanging tag', () => { if (G.tags.includes(t)) fixTag(t, true); }), at: tag }; }
+  if (pal) { const top = pal.cases[pal.cases.length - 1], same = top ? pal.cases.filter(c => c.d === top.d).length : 0; return { label: `Pick up ${same > 1 ? Math.min(same, CARRY_CAP) + ' cases' : 'a case'} (${pal.cases.length} on pallet)`, fn: () => playerPick(pal), at: pal, rep: true }; }
   if (fl) {
     if (fl.claimedBy) return { label: `${crewName(fl.claimedBy)} is about to push this float`, fn: null };
-    return { label: `Push the ${DEPT[fl.dept].name} float (${plural(fl.cases.length, 'case')})`, fn: () => grabFloat(fl) };
+    return { label: `Push the ${DEPT[fl.dept].name} float (${plural(fl.cases.length, 'case')})`, fn: () => grabFloat(fl), at: fl };
   }
-  if (rackDept && G.stock[rackDept].back > 0) return { label: `Pull backstock: ${DEPT[rackDept].name} (${Math.ceil(G.stock[rackDept].back / DEPT[rackDept].upc)} cs)`, fn: () => playerPullBack(rackDept) };
+  if (bird) {
+    const n = backCases(bird.dept), d = DEPT[bird.dept];
+    const push = { label: `Push the ${d.aisle} bird (${plural(n, 'case')})`, fn: () => grabBird(bird), at: bird };
+    const pull = n ? { label: `Carry ${Math.min(n, CARRY_CAP)} cs`, fn: () => playerPullBack(bird.dept), at: bird } : null;
+    if (shelfDept === bird.dept && n && canStock(bird.dept)) return { label: `Work backstock onto ${d.name} (${plural(n, 'case')} on the bird)`, fn: () => playerWorkBird(bird), at: bird, alt: { label: 'Push the bird', fn: push.fn } };
+    return { ...push, alt: pull };
+  }
   const ev2 = !p.work && eventsInteraction(p, shelfDept, false);
   if (ev2) return ev2;
   const mi = !p.work && moraleInteraction(p);
   const sw = !p.work && !mi && backroomInteraction(p, true);
   if (sw) return sw;
   if (mi) return mi;
+  const door = { x: MAPD.staffDoor.x + 0.5, y: MAPD.staffDoor.y + 0.5 };
+  if (dist(door, p) < 1.2) return { label: 'Clock out and go home', fn: () => askGoHome(), at: door };
   if (shelfDept) return { label: `${DEPT[shelfDept].aisle} · ${DEPT[shelfDept].name}: shelf ${Math.round(shelfPct(shelfDept) * 100)}% full`, fn: null };
   return null;
 }
 
+// One press grabs as many cases as you can carry, as long as they're for the same department.
 function playerPick(pal) {
-  const c = pal.cases.pop();
-  G.player.carry.push(c);
-  cardboard(1);
+  const p = G.player, room = CARRY_CAP - p.carry.length;
+  if (room <= 0 || !pal.cases.length) return;
+  const first = pal.cases.pop(), got = [first];
+  for (let i = pal.cases.length - 1; i >= 0 && got.length < room; i--) if (pal.cases[i].d === first.d) got.push(pal.cases.splice(i, 1)[0]);
+  p.carry.push(...got);
+  cardboard(got.length);
   if (!pal.cases.length) removeEmptyPallets();
-  floater(G.player.x, G.player.y - 0.9, caseLabel(c), DEPT[c.d].color);
+  floater(p.x, p.y - 0.9, caseLabel(first) + (got.length > 1 ? ` +${got.length - 1}` : ''), DEPT[first.d].color);
   SFX.pick();
 }
 function playerSort(f) {
@@ -1082,6 +1152,12 @@ function playerStockCarry(dept) {
   SFX.stock(m.length); comboHit(m.length, p);
 }
 function playerCarryToBack() { const p = G.player; p.carry.forEach(c => { G.stock[c.d].back += caseUnits(c); }); p.carry = []; }
+function playerCarryToBird(b) {
+  const p = G.player, m = p.carry.filter(c => c.d === b.dept);
+  m.forEach(c => { G.stock[c.d].back += caseUnits(c); });
+  p.carry = p.carry.filter(c => c.d !== b.dept);
+  SFX.drop();
+}
 function playerPullBack(dept) {
   const p = G.player, d = DEPT[dept], s = G.stock[dept];
   let u = Math.min(s.back, d.upc * CARRY_CAP);
@@ -1132,6 +1208,9 @@ function save() {
     }
     s.floats.forEach(f => { if (f.carriedBy !== 'player') f.carriedBy = null; f.claimedBy = null; f.incoming = 0; });
     s.tags.forEach(t => { t.claimedBy = null; });
+    Object.values(s.birds || {}).forEach(b => { if (b.carriedBy !== 'player') b.carriedBy = null; b.claimedBy = null; });
+    (s.spills || []).forEach(x => { x.claimedBy = null; });
+    if (s.cooler) s.cooler.claimedBy = null;
     s.vendorsToday.forEach(v => {
       v.claimedBy = null;
       if (v.state === 'stocking') { s.stock[v.dept].back += v.cases * DEPT[v.dept].upc; v.state = 'done'; }
@@ -1159,6 +1238,11 @@ function load() {
       if (v.state === 'waiting') RT.vendorNpcs[v.name] = { x: MAPD.vendorSpot.x + 0.5, y: MAPD.vendorSpot.y + 0.5, fx: 0, fy: 1, path: null, mode: 'wait', v };
     });
     if (G.player.floatId && !floatById(G.player.floatId)) G.player.floatId = null;
+    if (G.player.birdId && !(G.birds[G.player.birdId] && G.birds[G.player.birdId].carriedBy === 'player')) G.player.birdId = null;
+    if (G.player.away == null) { // a save from before you were on the schedule: start it tomorrow
+      G.player.away = false;
+      if (G.today) G.today.endAsked = G.today.autoIn = mgrShift(G.day);
+    }
     return true;
   } catch (e) { console.warn('Load failed', e); return false; }
 }
@@ -1172,8 +1256,17 @@ function frame(ts) {
   if (G) {
     pollGamepad();
     if (!isPaused()) {
-      updatePlayer(dt);
-      for (let i = 0; i < G.speed; i++) { update(dt); if (G.phase !== 'day' && G.phase !== 'night') break; }
+      if (G.player.away) awayStep(dt); // off the clock: the crew runs the store, time flies
+      else {
+        // You move and work at game speed too: one player step for every game step.
+        for (let i = 0; i < G.speed; i++) {
+          updatePlayer(dt);
+          update(dt);
+          if ((G.phase !== 'day' && G.phase !== 'night') || G.player.away) break;
+        }
+        holdRepeat(dt);
+      }
+      shiftTick();
     }
     RT.floaters.forEach(f => { f.t += dt; f.y -= dt * 0.6; });
     RT.floaters = RT.floaters.filter(f => f.t < 1.4);

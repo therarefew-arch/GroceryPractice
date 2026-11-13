@@ -30,6 +30,7 @@ function setupTouch() {
     <div id="joy"><div id="joy-knob"></div></div>
     <div id="tbtns">
       <button id="t-e" class="tbig">E</button>
+      <button id="t-q" class="tq hidden">Q</button>
       <button id="t-run" class="tmid">RUN</button>
       <div class="tsmall">
         <button id="t-zin">＋</button><button id="t-zout">－</button><button id="t-pause">⏸</button><button id="t-full">⛶</button>
@@ -42,7 +43,7 @@ function setupTouch() {
   let jid = null;
   const setDir = (dx, dy) => {
     const k = RT.keys;
-    k.TouchLeft = dx < -0.35; k.TouchRight = dx > 0.35; k.TouchUp = dy < -0.35; k.TouchDown = dy > 0.35;
+    RT.touchJoy = { x: dx, y: dy }; // analog: any direction, push further to go faster
   };
   const move = e => {
     const b = joy.getBoundingClientRect(), r = b.width / 2;
@@ -58,7 +59,9 @@ function setupTouch() {
 
   // ---- buttons ----
   const tap = (id, fn) => el.querySelector(id).addEventListener('pointerdown', e => { e.preventDefault(); fn(e); });
-  tap('#t-e', touchInteract);
+  tap('#t-e', () => { RT.keys.TouchE = true; RT.holdT = 0; touchInteract(); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => el.querySelector('#t-e').addEventListener(ev, () => { RT.keys.TouchE = false; }));
+  tap('#t-q', () => { if (!G || RT.modal || UI.open || isPaused() || G.player.work) return; const it = getInteraction(); if (it && it.alt && it.alt.fn) it.alt.fn(); });
   tap('#t-run', e => { RT.keys.TouchRun = !RT.keys.TouchRun; e.currentTarget.classList.toggle('on', RT.keys.TouchRun); });
   tap('#t-zin', () => setZoom(CAM.target * 1.25));
   tap('#t-zout', () => setZoom(CAM.target / 1.25));
@@ -89,7 +92,8 @@ function setupTouch() {
 function touchFrame() {
   if (!TOUCH) return;
   const el = $('touch'); if (!el) return;
-  el.classList.toggle('hidden', !!(UI.open || RT.modal));
+  el.classList.toggle('hidden', !!(UI.open || RT.modal || (G && G.player.away)));
+  const q = $('t-q'); if (q) { const a = RT.curIt && RT.curIt.alt && RT.curIt.alt.fn; q.classList.toggle('hidden', !a); if (a) q.title = RT.curIt.alt.label; }
   const p = $('t-pause'); if (p) p.textContent = RT.paused ? '▶' : '⏸';
 }
 

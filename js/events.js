@@ -142,7 +142,11 @@ function spillTick(gm) {
     }
   }
 }
-function cleanSpill(s) { G.spills = (G.spills || []).filter(x => x !== s); G.today.spillsCleaned = (G.today.spillsCleaned || 0) + 1; toast('🧽 Spill cleaned up.', 'good'); addXP(4, G.player); }
+function cleanSpill(s, crew) {
+  G.spills = (G.spills || []).filter(x => x !== s); G.today.spillsCleaned = (G.today.spillsCleaned || 0) + 1;
+  if (crew) toast(`🧽 ${crew.name.split(' ')[0]} cleaned up the ${s.what}.`, 'good');
+  else { toast('🧽 Spill cleaned up.', 'good'); addXP(4, G.player); }
+}
 
 // ---- Cooler breakdown -----------------------------------------------------------
 function breakCooler() {
@@ -156,15 +160,15 @@ function coolerHour() {
   const s = G.stock[k.dept], n = Math.round(s.shelf * 0.15);
   if (n > 0) { s.shelf -= n; const loss = n * DEPT[k.dept].price * 0.6; G.today.shrink += loss; G.today.coolerLoss = (G.today.coolerLoss || 0) + loss; if (CODE_DEPTS.includes(k.dept)) codesFix(k.dept); toast(`🌡 ${n} units of ${DEPT[k.dept].name} went warm and had to be thrown out (−${money(loss)}).`, 'bad'); }
 }
-function pullCooler() {
+function pullCooler(crew) {
   const k = G.cooler; if (!k || k.pulled) return;
   const s = G.stock[k.dept];
   const good = s.shelf - codeExp(k.dept);
   s.back += good; s.shelf = 0;
   if (CODE_DEPTS.includes(k.dept)) { const c = codes(k.dept); c.short = c.exp = c.md = 0; }
   k.pulled = true; k.fixAt = G.time + 150;
-  toast(`🧊 Pulled ${good} units into the backroom cooler and called maintenance. ETA ${fmtTime(k.fixAt)}.`, 'good');
-  addXP(10, G.player);
+  toast(`🧊 ${crew ? crew.name.split(' ')[0] + ' pulled' : 'Pulled'} ${good} units into the backroom cooler and called maintenance. ETA ${fmtTime(k.fixAt)}.`, 'good');
+  if (!crew) addXP(10, G.player);
 }
 function coolerTick() {
   const k = G.cooler; if (!k || !k.pulled) return;
@@ -175,8 +179,8 @@ function coolerTick() {
 function eventsInteraction(p, shelfDept, urgent) {
   if (!urgent) return codeCheckInteraction(shelfDept);
   const sp = (G.spills || []).find(s => dist(s, p) < 1.2);
-  if (sp) return { label: `Clean up the spill (${sp.what})`, fn: () => startWork(2, 'Cleaning spill', () => cleanSpill(sp)) };
-  if (G.cooler && !G.cooler.pulled && shelfDept === G.cooler.dept) return { label: `🚨 Pull ${DEPT[shelfDept].name} to the backroom cooler & call maintenance`, fn: () => startWork(3, 'Pulling product', pullCooler) };
+  if (sp) return { label: `Clean up the spill (${sp.what})`, fn: () => startWork(2, 'Cleaning spill', () => { if ((G.spills || []).includes(sp)) cleanSpill(sp); }), at: sp };
+  if (G.cooler && !G.cooler.pulled && shelfDept === G.cooler.dept) return { label: `🚨 Pull ${DEPT[shelfDept].name} to the backroom cooler & call maintenance`, fn: () => startWork(3, 'Pulling product', () => pullCooler()) };
   return null;
 }
 function codeCheckInteraction(shelfDept) {

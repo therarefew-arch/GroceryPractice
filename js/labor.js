@@ -15,6 +15,9 @@ const OT_WEEKLY_MIN = 40 * 60;
 const DAY1_DATE = Date.UTC(2026, 10, 14); // Day 1 is Saturday 11/14/2026
 const OFF = 'off';
 const OFF_PAIRS = [[2, 3], [4, 5], [3, 4], [2, 5], [3, 5], [2, 4]]; // Mon/Tue, Wed/Thu, ... (weekends are busy)
+// You (the store manager) have a row too. Default: opens, off Tuesday and Wednesday.
+const MGR = 'mgr';
+const MGR_DEFAULT = ['open', 'open', 'open', OFF, OFF, 'open', 'open'];
 
 // Game-scale labor standards (the game moves ~150–300 cases a day, not 1,500).
 const STD = {
@@ -65,12 +68,13 @@ function defaultRow(c, idx) {
 function schedFor(w) {
   G.sched = G.sched || {};
   let s = G.sched[w];
+  const prev = G.sched[w - 1];
   if (!s) {
-    const prev = G.sched[w - 1];
     s = G.sched[w] = { posted: false, rows: {} };
     G.crew.forEach((c, i) => { s.rows[c.id] = prev && prev.rows[c.id] ? prev.rows[c.id].slice() : defaultRow(c, i); });
   }
   G.crew.forEach((c, i) => { if (!s.rows[c.id]) s.rows[c.id] = defaultRow(c, i); });
+  if (!s.rows[MGR]) s.rows[MGR] = prev && prev.rows[MGR] ? prev.rows[MGR].slice() : MGR_DEFAULT.slice();
   return s;
 }
 function schedOf(c, day) {
@@ -94,6 +98,7 @@ function schedNewHire(c) {
 }
 // Changing a cell. Changes to a posted schedule (from today on) cost morale.
 function setSched(w, id, i, v) {
+  if (id === MGR) return setMgrSched(w, i, v);
   const s = schedFor(w), c = G.crew.find(x => x.id === id); if (!c) return;
   const row = s.rows[id], cw = weekOf(G.day);
   if (w < cw || (w === cw && i < dowIdx(G.day))) return; // the past is the past
@@ -102,6 +107,19 @@ function setSched(w, id, i, v) {
   if (s.posted && (c.days || 0) > 0) bump(c, today ? -6 : -4, 'schedule');
   row[i] = v;
   if (today) { const r = RT.crew[c.id]; if (r && r.plan) finishPlan(c, r); }
+}
+// Your own row: no morale cost, and today can change (you'll clock in or go home to match).
+function setMgrSched(w, i, v) {
+  const s = schedFor(w), cw = weekOf(G.day);
+  if (w < cw || (w === cw && i < dowIdx(G.day))) return;
+  s.rows[MGR][i] = v;
+}
+// Salaried: a manager's shift counts in full (no unpaid lunch).
+const mgrShiftMin = sk => (sk && sk !== OFF && SHIFTS[sk] ? SHIFTS[sk].end - SHIFTS[sk].start : 0);
+const mgrPaidMin = w => sum((schedFor(w).rows[MGR] || []).map(mgrShiftMin));
+function mgrShift(day) {
+  const s = G.sched && G.sched[weekOf(day)], v = s && s.rows[MGR] ? s.rows[MGR][dowIdx(day)] : 'open';
+  return v === OFF || !SHIFTS[v] ? null : v;
 }
 function postSchedule(w) {
   const s = schedFor(w);
@@ -200,7 +218,7 @@ function exceptionReport(w) {
   });
   let run = { dmd: sub[0], sch: sub[1], tD: tot(sub[0]), tS: tot(sub[1]) };
   rows.push({ name: 'Sub Total', total: true, ...run });
-  const wk = weeklyDemand(w), mgrSched = 45;
+  const wk = weeklyDemand(w), mgrSched = r2(mgrPaidMin(w) / 60);
   LD_WEEKLY.forEach((sec, si) => {
     sec.forEach(r => {
       const s = r.key === 'mgr' ? mgrSched : 0;

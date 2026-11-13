@@ -43,7 +43,7 @@ const TASK_CHECK = {
   swept: a => sweptAfter(a.after),
   empties: () => !G.empties.length,
   floatsStraight: () => !crookedFloats().length,
-  birds: () => !birdsOver().length,
+  birds: () => !birdsOnFloor().length,
   forecast: () => { const f = G.fc && G.fc[weekOf(G.day) + 1]; return !!f && f.by === 'you'; },
   schedule: () => { const s = G.sched && G.sched[weekOf(G.day) + 1]; return !!s && s.posted && s.postedBy === 'you'; },
 };
@@ -67,7 +67,7 @@ function buildChecklist() {
   if (maxCrew() >= 6) add('closers', 'closers', `${CLOSERS_REQUIRED} closers on the schedule`, 'Store rule: 3 grocery closers a night', 840, 'at');
   add('closerun', 'shelves', 'Close run: water, milk, eggs, ice', 'Beverage, dairy and frozen 85%+ at 10:45 PM', 1365, 'at', { depts: ['A2', 'DAI', 'FRZ'], pct: 0.85 });
   add('sweep-mid', 'swept', 'Mid-day backroom sweep', 'E anywhere in the backroom, between 11 AM and 3 PM', 900, 'by', { after: 660 });
-  add('birds', 'birds', 'No birds on the sales floor', 'Every aisle\'s backstock fits on its bird (checked at 2 PM)', 840, 'at');
+  add('birds', 'birds', 'No birds on the sales floor', 'Every bird is parked in BACKSTOCK and nothing overflows (checked at 2 PM)', 840, 'at');
   add('empties', 'empties', 'Empty pallets stacked in reload staging', 'Nothing left on the receiving spots at close', 1375, 'at');
   add('floats', 'floatsStraight', 'Float staging straight', 'Every float square on its home spot at close', 1375, 'at');
   add('sweep-close', 'swept', 'End-of-day backroom sweep', 'Sweep after 9 PM', 1378, 'by', { after: 1260 });
