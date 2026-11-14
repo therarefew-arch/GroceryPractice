@@ -42,7 +42,9 @@ function nameplate(g, text, x, y, opts) {
   g.fillStyle = opts.edge || PAL.plateEdge; g.fillRect(rx, ry, w, 2);
   g.fillStyle = 'rgba(255,255,255,0.08)'; g.fillRect(rx, ry + 2, w, 1);
   g.strokeStyle = opts.edge || PAL.plateEdge; g.globalAlpha = 0.6; g.strokeRect(rx + 0.5, ry + 0.5, w - 1, h - 1); g.globalAlpha = 1;
-  label(g, text, x, y + 1, { font: g.font, color: opts.color || '#f2f7ff' });
+  // Snap the text to whole pixels: a half-pixel start smears the pixel font (the R in DAIRY).
+  const tw = g.measureText(text).width;
+  label(g, text, Math.round(x - tw / 2), Math.round(y + 1), { font: g.font, color: opts.color || '#f2f7ff', align: 'left' });
   return w;
 }
 const noise = (x, y) => ((((x * 73856093) ^ (y * 19349663)) >>> 0) % 1000) / 1000;
