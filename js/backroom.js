@@ -277,7 +277,7 @@ function drawBackroom() {
     ctx.fillStyle = '#3a3f47'; ctx.fillRect(x, y, 24, 24);
     for (let k = 0; k < 2; k++) for (let i = 0; i < 3; i++) { ctx.fillStyle = col; ctx.fillRect(x + 2 + i * 7, y + 2 + k * 11, 6, 9); }
     const blink = (performance.now() / 400 | 0) % 2;
-    if (blink) label(ctx, 'BIRD!', s.x * T, y - 4, { font: PX(7), color: '#ff8c1a', outline: '#000' });
+    if (blink) label(ctx, 'OVERFLOW', s.x * T, y - 4, { font: PX(7), color: '#ff8c1a', outline: '#000' });
   }
 }
 // Crooked floats: drawn by wrapping drawFloat.

@@ -1,6 +1,6 @@
 # Grocery Practice
 
-**Version 0.0.42**
+**Version 0.0.43**
 
 A 2D grocery store manager simulator for practicing the real job: receiving the night truck, building floats, working freight, keeping the shelves full, running the crew, and ordering for tomorrow. All without blowing the labor budget.
 
@@ -36,7 +36,7 @@ It's plain HTML/JavaScript, so there's no build step.
 ## What's in the store
 
 **Freight and the floor**
-- **Truck to shelf:** pallets → department floats → the shelf; overflow goes on each aisle's **bird** (a backstock cart with wheels). A blinking **BIRD!** means an aisle has more backstock than its bird holds. Cold pallets spoil if they sit.
+- **Truck to shelf:** pallets → department floats → the shelf; overflow goes on each aisle's **bird** (a backstock cart with wheels). A blinking **OVERFLOW** cart on the floor means an aisle has more backstock than its bird holds. Cold pallets spoil if they sit.
 - **Hard mode by default:** cases show only the item name. Easy mode (Help & Settings) adds the aisle.
 - **Facing and go-backs:** shoppers mess up the aisles. Face everything at 5 PM and before close, and put go-backs away.
 - **Backroom upkeep:** empty pallets, the baler, reload staging, sweeping, crooked floats. You can rearrange the backroom layout, but the store itself never changes shape.
