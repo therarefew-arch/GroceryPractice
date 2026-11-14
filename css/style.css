@@ -253,3 +253,14 @@ body.touch #h-day { white-space: nowrap; }
   body.touch #hud .stats { order: 3; width: 100%; justify-content: space-between; }
   body.touch #btn-menu { position: static; margin-left: auto; }
 }
+
+/* How to play (js/guide.js) */
+.guide details { border: 1px solid #5a4220; background: #1a140b; margin: 6px 0; }
+.guide summary { cursor: pointer; padding: 8px 10px; font-weight: bold; list-style: none; }
+.guide summary::-webkit-details-marker { display: none; }
+.guide summary::after { content: '▸'; float: right; color: #c98a2a; }
+.guide details[open] summary::after { content: '▾'; }
+.guide .gd-i { display: inline-block; width: 1.6em; }
+.guide .gd-b { padding: 0 12px 10px; line-height: 1.5; }
+.guide .gd-b ol, .guide .gd-b ul { margin: 4px 0; padding-left: 20px; }
+.tt-panel .guide { max-height: 55vh; overflow-y: auto; }

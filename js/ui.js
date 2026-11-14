@@ -581,6 +581,7 @@ const UI = {
   tab_help() {
     return `<h2>Help & Settings</h2>
       <h3>Controls</h3><p><kbd>WASD</kbd>/<kbd>Arrows</kbd> move · <kbd>Shift</kbd> run · <kbd>E</kbd>/<kbd>Space</kbd> interact (hold to repeat) · <kbd>Q</kbd> second action · <kbd>P</kbd> pause · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> speed 1×/2×/4× · <kbd>Esc</kbd> leave the computer</p>
+      <h3>📖 How to play</h3>${guideHTML(-1)}
       <h3>The daily loop</h3><ol>
       <li><b>5:00 AM</b> — Last night's truck is in Receiving. Break pallets down onto department floats (blue spots). You carry up to 3 cases.</li>
       <li>Push a float to its aisle and work it onto the shelf. When the shelf is full, take the overflow to its aisle's <b>bird</b> in Backstock (top middle). Birds have wheels: push one out to its aisle and work it onto the shelf.</li>
@@ -611,7 +612,7 @@ const UI = {
       <p><kbd>WASD</kbd>/<kbd>Arrows</kbd> move · <kbd>Shift</kbd> run · <kbd>E</kbd> interact · <kbd>Q</kbd> second action · <kbd>P</kbd> pause · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> speed</p>
       <p class="mute">You're on the schedule: you open today (5 AM to 2 PM). When your shift ends you can go home and the crew runs the rest of the day.</p>
       <p class="mute">Tip: Dairy & Frozen pallets (blue outline) spoil if they sit. Work cold first.</p>
-      <div class="row" style="justify-content:flex-end"><button class="primary" onclick="UI.hideModal()">Clock in for Day 1 →</button></div>`);
+      <div class="row" style="justify-content:flex-end"><button onclick="UI.howToPlay('UI.showWelcome()')">📖 How to play</button><button class="primary" onclick="UI.hideModal()">Clock in for Day 1 →</button></div>`);
   },
   // In-game yes/no box (the browser's confirm() pop-up is blocked in some embedded browsers).
   ask(title, body, yes, onYes, danger, no) {

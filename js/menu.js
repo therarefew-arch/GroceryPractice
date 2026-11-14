@@ -51,9 +51,12 @@ function titleRender() {
       ${last ? `<button class="primary" onclick="playSlot(${last})">▶ Continue <span class="tt-sub">Slot ${last}${slotMeta(last).day ? ' · Day ' + slotMeta(last).day : ''}</span></button>` : ''}
       <button class="${last ? '' : 'primary'}" onclick="TITLE.view='new';titleRender()">✚ New game</button>
       <button ${last ? '' : 'disabled'} onclick="TITLE.view='load';titleRender()">📂 Load game</button>
+      <button onclick="TITLE.view='guide';titleRender()">📖 How to play</button>
       <button onclick="TITLE.view='options';titleRender()">⚙ Options</button></div>`;
   } else if (v === 'new' || v === 'load') {
     body = `<h2>${v === 'new' ? '✚ New game: pick a slot' : '📂 Load game'}</h2><div class="slots">${slotCardsHTML(v, false)}</div><div class="tt-row"><button onclick="TITLE.view='main';titleRender()">← Back</button></div>`;
+  } else if (v === 'guide') {
+    body = `<h2>📖 How to play</h2>${guideHTML(0)}<div class="tt-row"><button onclick="TITLE.view='main';titleRender()">← Back</button></div>`;
   } else if (v === 'options') {
     body = `<h2>⚙ Options</h2>${optionsHTML()}<div class="tt-row"><button onclick="TITLE.view='main';titleRender()">← Back</button></div>`;
   }
@@ -192,7 +195,7 @@ function runAct(i) { const a = (RT.actList || [])[i]; UI.hideModal(); RT.actList
 // ---------------------------------------------------------------- in-game Save / Load
 UI.loadMenu = function () {
   this.showModal(`<h2>📂 Game menu</h2><p class="mute">You're playing in slot ${SLOT}. The game also saves itself at the end of each day and when you leave the page.</p><div class="slots">${slotCardsHTML('load', true)}</div>
-    <div class="row" style="justify-content:space-between;margin-top:12px"><button onclick="UI.optionsMenu()">⚙ Options</button><span><button onclick="UI.ask('Go to the title screen?', 'Your game is saved to slot ${SLOT} first.', 'Title screen', () => showTitle())">⏏ Title screen</button> <button class="primary" onclick="UI.hideModal()">Back to the store</button></span></div>`);
+    <div class="row" style="justify-content:space-between;margin-top:12px"><span><button onclick="UI.optionsMenu()">⚙ Options</button> <button onclick="UI.howToPlay('UI.loadMenu()')">📖 How to play</button></span><span><button onclick="UI.ask('Go to the title screen?', 'Your game is saved to slot ${SLOT} first.', 'Title screen', () => showTitle())">⏏ Title screen</button> <button class="primary" onclick="UI.hideModal()">Back to the store</button></span></div>`);
 };
 UI.optionsMenu = function () {
   this.showModal(`<h2>⚙ Options</h2>${optionsHTML()}<div class="row" style="justify-content:flex-end;margin-top:12px"><button onclick="UI.loadMenu()">← Back</button><button class="primary" onclick="UI.hideModal()">Done</button></div>`);
