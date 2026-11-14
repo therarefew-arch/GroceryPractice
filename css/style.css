@@ -178,3 +178,6 @@ body.touch .away-card { font-size: 14px; padding: 6px 8px; }
 .ivs-choices button.primary { text-align: center; }
 .ivs-hint { font: 16px var(--term); color: var(--mute); margin-top: 8px; text-align: center; }
 @media (max-width: 560px) { .ivs-choices { grid-template-columns: 1fr; } .ivs-text { font-size: 20px; } }
+
+/* Music button (js/music.js) */
+#btn-music.off { opacity: .4; text-decoration: line-through; }

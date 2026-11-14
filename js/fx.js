@@ -12,8 +12,10 @@ try { FX.muted = localStorage.getItem('groceryPractice.muted') === '1'; } catch 
 
 // ---- Sound -----------------------------------------------------------
 function sfxInit() {
-  if (FX.ac) return;
-  try { FX.ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { FX.ac = null; }
+  if (!FX.ac) { try { FX.ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { FX.ac = null; } }
+  if (!FX.ac) return;
+  if (FX.ac.state === 'suspended' && !document.hidden) FX.ac.resume();
+  if (typeof musicStart === 'function') musicStart(); // js/music.js
 }
 function tone(freq, dur, opts) {
   if (FX.muted || !FX.ac) return;

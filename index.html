@@ -41,6 +41,7 @@
         <button data-speed="2" title="Fast (2)">2×</button>
         <button data-speed="4" title="Faster (3)">4×</button>
       </div>
+      <button id="btn-music" title="Music on/off" onclick="toggleMusic()">🎵</button>
       <button id="btn-mute" title="Sound on/off (M)" onclick="toggleMute()">🔊</button>
       <button id="btn-home" class="hidden" title="Clock out and go home">🏠</button>
       <button id="btn-endnight" class="primary hidden">End night ▶</button>
@@ -50,7 +51,7 @@
   <footer id="bar">
     <span id="prompt"></span>
     <span id="holding"></span>
-    <span id="ver" class="keys" title="Game version">v0.0.35</span>
+    <span id="ver" class="keys" title="Game version">v0.0.36</span>
     <span class="keys">WASD move · Scroll / +− / Z zoom · Shift run · E interact (hold) · Q 2nd action · M sound · P pause · 1/2/3 speed</span>
   </footer>
 
@@ -93,6 +94,7 @@
   <script src="js/checklist.js"></script>
   <script src="js/render.js"></script>
   <script src="js/fx.js"></script>
+  <script src="js/music.js"></script>
   <script src="js/review.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/ivscene.js"></script>
