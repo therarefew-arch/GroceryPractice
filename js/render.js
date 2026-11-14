@@ -237,7 +237,19 @@ function drawBG() {
     g.fillStyle = d.color; g.fillRect(Math.round(cx - w / 2), Math.round(cy + 10), w, 2);
     label(g, d.name.toUpperCase(), cx, cy + 6, { font: PX(6, false), color: '#9fc8e6' });
   }
-  { const w = nameplate(g, 'DAIRY', 37.5 * T + 2, 11.0 * T, { font: PX(8), h: 12, edge: DEPT.DAI.color }); (MAPD.signs = MAPD.signs || {}).DAI = { x: Math.round(37.5 * T + 2 - w / 2), y: Math.round(11.0 * T + 8), w }; }
+  // Dairy sign: same style and height as the aisle signs, over the cooler column,
+  // pulled left just enough to clear the right wall.
+  {
+    const d = DEPT.DAI, col = MAPD.shelfTiles.DAI[0].x, cy = 11.45 * T;
+    g.font = PX(8);
+    const pw = Math.ceil(g.measureText('DAIRY').width) + 10;
+    const cx = Math.round(Math.min(col * T + T / 2, (MW - 1) * T - 2 - pw / 2));
+    const w = nameplate(g, 'DAIRY', cx, cy - 5, { font: PX(8), h: 12 });
+    MAPD.signs.DAI = { x: Math.round(cx - w / 2), y: Math.round(cy + 13), w };
+    g.fillStyle = '#0d1626'; g.fillRect(Math.round(cx - w / 2), Math.round(cy + 1), w, 10);
+    g.fillStyle = d.color; g.fillRect(Math.round(cx - w / 2), Math.round(cy + 10), w, 2);
+    label(g, 'COOLER', cx, cy + 6, { font: PX(6, false), color: '#9fc8e6' });
+  }
   return b;
 }
 
