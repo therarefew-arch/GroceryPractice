@@ -72,7 +72,7 @@ function moodOf(c) {
 // Work-speed multiplier from morale and the Lead role.
 function moraleSpeed(c) {
   const m = ensureMorale(c).morale;
-  return (m < 25 ? 0.85 : m < 45 ? 0.93 : m >= 80 ? 1.05 : 1) * (c.lead ? 1.05 : 1);
+  return (m < 25 ? 0.85 : m < 45 ? 0.93 : m >= 80 ? 1.05 : 1) * (c.lead ? 1.05 : 1) * asmSpeed(c);
 }
 function calloutChance(c) { const m = ensureMorale(c).morale; return Math.max(0.01, 0.04 + (m < 40 ? 0.08 : 0) + (m < 20 ? 0.06 : 0) + (REL_CALLOUT[c.rel] || 0)); }
 function sentHomeToday(c) { return c.sentHome === G.day; }

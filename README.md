@@ -1,6 +1,6 @@
 # Grocery Practice
 
-**Version 0.0.40**
+**Version 0.0.41**
 
 A 2D grocery store manager simulator for practicing the real job: receiving the night truck, building floats, working freight, keeping the shelves full, running the crew, and ordering for tomorrow. All without blowing the labor budget.
 
@@ -115,6 +115,8 @@ It's plain HTML/JavaScript, so there's no build step.
 
 **On your phone:** open https://therarefew-arch.github.io/GroceryPractice/ and turn the phone sideways. On touch screens you get a floating analog joystick: put your thumb down anywhere on the left side (anywhere under the game with the phone upright) and the stick starts right there; push further to go faster, and it follows your thumb if you drag past the edge. A quick tap there still taps the game. You also get a big **E** button (hold it to repeat), a blue **Q** button when there's a second action, **RUN** (tap to toggle), zoom, pause and full screen. You can also tap the yellow action text at the bottom, and tap a crew member to see their card. To install it like an app: iPhone, Safari → Share → Add to Home Screen; Android, Chrome → ⋮ → Add to Home screen / Install app. It works offline after the first load. Your phone keeps its own save. Add `?touch=1` to the URL to force the touch controls on (or `?touch=0` to turn them off).
 
+**Growing a successor (🌱):** a store manager's real job is to build the bench. In Crew & Schedule, pick one protégé (a Pro or Superstar with 5+ days, or a Lead). On a day they work, give them one **stretch task**: run the truck, lead the 5 PM recovery, train a new hire or run the ad flip on the way to Lead; close the store, write the order, handle the customers or run labor on the way to Assistant Manager. How it goes depends on their skill, their morale, how the store really did at that job that day, and whether you set them up first with a **development talk** (walk up and press `E`, once a day). A task that goes badly still teaches, if you debrief them the next day. Readiness 50 → Lead; readiness 100 plus 7 days as a Lead → Assistant Manager (one per store, +$2.50/hr). An ASM on shift makes the whole crew a little faster and settles fights while you're away. After about three weeks the district asks whether your ASM is ready for a store of their own: saying yes means losing them, and it's the best thing on your record.
+
 **Crew orders (micromanage):** click (or tap) an associate on the map, or use 📌 Orders in the Crew tab, and tell them exactly what to do: work the truck, break down pallets, unload the trailer, get one department's freight out, fill holes in a department, run an aisle's bird, face an aisle, cycle count a department, work reclaim, work the go-backs, watch the back door for DSD, hang price tags (and "temporarily out" tags), pull a recall, work the planogram reset, switch or fill an endcap, pick up cardboard or do backroom upkeep. They drop what they're doing, work the order until it's done or about 2 hours pass, then go back to their job. Orders outside their job (dashed buttons) work 15% slower unless they're a Lead or Superstar. More than 4 orders to one person in a day starts to cost morale: they want to finish something.
 
 **Weekly DM review:** after Friday's close (weeks run Saturday to Friday) your District Manager grades the week. He is harsh but fair: for every problem he tells you what he saw, why it matters and what to do next week. Reviews also land in your email and on the Records tab.
@@ -155,6 +157,7 @@ Everything store-specific lives in [`js/data.js`](js/data.js): departments/aisle
 | `js/weather.js` | Weather: daily weather and the 3-day forecast, storm stock-up days, slow storm days, the entrance mat, weather call-outs |
 | `js/customers.js` | Customer interactions: questions, stock checks, price disputes and upset customers, what you say and how it lands |
 | `js/perf.js` | Performance reviews and raises: due dates, the facts on file, ratings, the merit matrix and budget |
+| `js/successor.js` | Growing a successor: the protégé, stretch tasks, development talks, promotion to Lead and Assistant Manager, the own-store offer |
 | `js/huddle.js` | The morning huddle: yesterday and today on one sheet, the day's priority (mistake focus), shout-outs |
 | `js/menu.js` | Title screen, save slots, options, the volume sliders and the tap / hold More options menu |
 | `js/music.js` | Store music: the generative ambient tracks, pads, pluck, bass, chimes and hats |
