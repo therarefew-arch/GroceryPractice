@@ -148,7 +148,7 @@ function dropTrash(r) {
 }
 function trashHour() {
   if (!G.trash || !G.trash.length || G.time < OPEN) return;
-  G.sat = Math.max(0, G.sat - 0.4 * G.trash.length);
+  G.sat = Math.max(0, G.sat - Math.min(2, 0.25 * G.trash.length));
 }
 function pickUpTrash(tr) {
   G.trash = G.trash.filter(t => t !== tr);

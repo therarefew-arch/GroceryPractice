@@ -228,3 +228,51 @@ UI.optionsMenu = function () {
   }, 0);
 })();
 if (TOUCH && $('t-e')) holdTap($('t-e'), () => touchInteract(), openActionMenu);
+
+// ---------------------------------------------------------------- phone-width tables
+// A table wider than the screen turns into a stack of cards: each row is a
+// card and each cell shows its column name, so nothing runs off the side.
+function stackWideTables(root) {
+  if (!root || innerWidth > 760) return;
+  root.querySelectorAll('table').forEach(tb => {
+    if (tb.classList.contains('stack') || tb.scrollWidth <= tb.parentElement.clientWidth + 2) return;
+    let heads = null;
+    tb.querySelectorAll('tr').forEach(tr => {
+      const cells = [...tr.children];
+      if (cells.length && cells.every(c => c.tagName === 'TH')) { heads = cells.map(c => c.textContent.trim()); tr.classList.add('st-head'); return; }
+      if (cells.length === 1) { tr.classList.add('st-full'); return; }
+      cells.forEach((c, i) => { if (heads && heads[i]) c.dataset.label = heads[i]; });
+    });
+    tb.classList.add('stack');
+  });
+}
+
+// ---------------------------------------------------------------- phone top bar: ☰ menu
+// On a phone the top bar keeps the clock, the stats and Go home; speed, music,
+// sound, save, load and your level move into ☰.
+function hudMenu(btn) {
+  let p = $('hudmenu');
+  if (p && !p.classList.contains('hidden')) { p.classList.add('hidden'); return; }
+  if (!p) { p = document.createElement('div'); p.id = 'hudmenu'; document.body.appendChild(p); }
+  if (!G) return;
+  const L = level(), a = xpForLevel(L), b = xpForLevel(L + 1);
+  const sp = v => `<button class="${v === 0 ? (RT.paused ? 'on' : '') : (!RT.paused && G.speed === v ? 'on' : '')}" onclick="${v === 0 ? 'RT.paused = !RT.paused' : `setSpeed(${v})`}; hudMenu(); hudMenu()">${v === 0 ? (RT.paused ? '▶' : '⏸') : v + '×'}</button>`;
+  p.innerHTML = `<div class="hm-lv">Lv ${L} · ${esc(title())}<span>bank ${money(G.bank)}</span></div><div class="xpbar"><div style="width:${(G.xp - a) / (b - a) * 100}%"></div></div>
+    <div class="hm-h">Speed</div><div class="seg hm-seg">${[0, 1, 2, 4].map(sp).join('')}</div>
+    <div class="hm-g"><button onclick="hudMenu(); volPopup('music', $('btn-menu'))">🎵 Music${MUSIC.on ? '' : ' (off)'}</button><button onclick="hudMenu(); volPopup('sfx', $('btn-menu'))">${FX.muted ? '🔇' : '🔊'} Sound${FX.muted ? ' (muted)' : ''}</button>
+    <button onclick="hudMenu(); saveToSlot(SLOT)">💾 Save</button><button onclick="hudMenu(); UI.loadMenu()">📂 Game menu</button></div>`;
+  p.classList.remove('hidden');
+  const r = (btn || $('btn-menu')).getBoundingClientRect();
+  p.style.top = Math.round(r.bottom + 6) + 'px';
+  p.style.right = Math.max(6, Math.round(innerWidth - r.right)) + 'px';
+}
+(function setupHudMenu() {
+  const hud = $('hud'); if (!hud || $('btn-menu')) return;
+  ($('btn-endnight') || hud).insertAdjacentHTML($('btn-endnight') ? 'afterend' : 'beforeend', '<button id="btn-menu" title="Menu">☰</button>');
+  $('btn-menu').onclick = e => { e.currentTarget.blur(); sfxInit(); hudMenu(e.currentTarget); };
+  document.addEventListener('pointerdown', e => {
+    const p = $('hudmenu'); if (!p || p.classList.contains('hidden')) return;
+    if (p.contains(e.target) || e.target.id === 'btn-menu') return;
+    p.classList.add('hidden');
+  });
+})();

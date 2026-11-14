@@ -222,3 +222,34 @@ input[type=range] { accent-color: var(--acc); width: 150px; height: 28px; }
 .actmenu button { text-align: left; min-height: 44px; font-size: 12px; white-space: normal; line-height: 1.35; display: flex; align-items: center; gap: 10px; }
 .am-i { font-size: 18px; width: 24px; text-align: center; flex: none; }
 @media (max-width: 480px) { .slot { flex-wrap: wrap; } .slot-b { flex-direction: row; width: 100%; } .slot-b button { flex: 1; } input[type=range] { width: 110px; } }
+/* Wide tables on a phone become stacked cards (stackWideTables in js/menu.js) */
+table.stack, table.stack tbody, table.stack tr, table.stack td, table.stack th { display: block; width: 100%; }
+table.stack tr.st-head { display: none; }
+table.stack tr { border: 1px solid var(--line); background: #15120e; margin-bottom: 8px; padding: 6px 8px; }
+table.stack tr.st-full { border: none; background: none; padding: 6px 0 0; }
+table.stack td { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: none; padding: 3px 0; text-align: right; }
+table.stack td:first-child { text-align: left; justify-content: flex-start; font-weight: 700; }
+table.stack td[data-label]::before { content: attr(data-label); color: var(--mute); text-align: left; font-size: 15px; flex: none; max-width: 45%; }
+table.stack td:first-child[data-label]::before { display: none; }
+table.stack td select, table.stack td input { max-width: 55%; }
+table.stack td { flex-wrap: wrap; }
+@media (max-width: 760px) { #pc-main, #modal-card { overflow-wrap: anywhere; } #pc-main pre, #pc-main code { white-space: pre-wrap; } }
+.mail-body { max-width: 100%; box-sizing: border-box; }
+/* Phone top bar: less-used buttons live in ☰ (hudMenu in js/menu.js) */
+#btn-menu { display: none; font-size: 16px; padding: 2px 10px; }
+body.touch #btn-menu { display: inline-block; position: sticky; right: 0; flex: none; }
+body.touch #hud .speed, body.touch #btn-music, body.touch #btn-mute, body.touch #btn-save, body.touch #btn-load, body.touch #hud .lvl { display: none; }
+#hudmenu { position: fixed; z-index: 45; width: 250px; background: #0f0c08; border: 2px solid #c98a2a; box-shadow: 0 0 0 3px #1a140b, 0 0 24px #ffb23855; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+#hudmenu.hidden { display: none; }
+.hm-lv { display: flex; justify-content: space-between; font: 700 11px var(--pix); color: var(--acc); }
+.hm-lv span { color: var(--mute); }
+.hm-h { font: 700 10px var(--pix); color: var(--mute); margin-top: 4px; }
+.hm-seg button { flex: 1; min-height: 38px; }
+.hm-g { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
+.hm-g button { min-height: 42px; }
+body.touch #h-day { white-space: nowrap; }
+@media (orientation: portrait) {
+  body.touch #hud { flex-wrap: wrap; overflow: visible; row-gap: 4px; }
+  body.touch #hud .stats { order: 3; width: 100%; justify-content: space-between; }
+  body.touch #btn-menu { position: static; margin-left: auto; }
+}

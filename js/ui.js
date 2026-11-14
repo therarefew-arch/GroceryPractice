@@ -106,7 +106,7 @@ const UI = {
     $('h-mail').textContent = unread;
     $('h-mail').className = unread ? 'warn' : '';
     $('h-title').textContent = `Lv ${level()} · ${title()}`;
-    $('h-xp').style.width = (G.xp % XP_PER_LEVEL) / XP_PER_LEVEL * 100 + '%';
+    { const L = level(), a = xpForLevel(L), b = xpForLevel(L + 1); $('h-xp').style.width = (G.xp - a) / (b - a) * 100 + '%'; }
     $('h-bank').textContent = money(G.bank);
     document.querySelectorAll('[data-speed]').forEach(b => {
       const v = +b.dataset.speed;
@@ -130,6 +130,7 @@ const UI = {
     $('pc-tabs').innerHTML = tabs.map(([k, l]) => `<button class="${this.tab === k ? 'on' : ''}" onclick="UI.setTab('${k}')">${l}</button>`).join('') +
       `<div style="flex:1"></div><div class="mute" style="font-size:12px;padding:6px">The clock is paused while you're logged in.</div>`;
     $('pc-main').innerHTML = main;
+    stackWideTables($('pc-main'));
   },
 
   tab_sir() {
@@ -258,7 +259,7 @@ const UI = {
   openMail(id) { this.mailId = id; this.render(); },
 
   tab_crew() {
-    let h = `<h2>Crew</h2><p class="mute">Change roles any time. "Usual shift" changes their shift for the rest of this week and next week (days off stay off); set day-by-day shifts in 🗓 Schedule. Crew slots: ${G.crew.length}/${maxCrew()} (level up for more). Team morale: <b style="color:${moodOf({ morale: teamMorale(), trait: 'quiet' }).col}">${Math.round(teamMorale())}%</b></p>`;
+    let h = `<h2>Crew</h2><p class="mute">Change roles any time. "Usual shift" changes their shift for the rest of this week and next week (days off stay off); set day-by-day shifts in 🗓 Schedule. Crew slots: ${G.crew.length}/${maxCrew()} (${maxCrew() < MAX_CREW ? 'level up for more' : 'the most this store can hold'}). Team morale: <b style="color:${moodOf({ morale: teamMorale(), trait: 'quiet' }).col}">${Math.round(teamMorale())}%</b></p>`;
     h += `<table><tr><th>Name</th><th>Role</th><th>Usual shift</th><th>Skill</th><th>Rank</th><th>Training</th><th>Morale</th><th class="n">Coached</th><th class="n">Days</th><th class="n">Wage</th><th>Right now</th><th></th></tr>`;
     for (const c of G.crew) {
       const r = RT.crew[c.id];
@@ -591,7 +592,7 @@ const UI = {
   setLabels(on) { RT.settings.labels = on; try { localStorage.setItem('groceryPractice.labels', on ? 'on' : 'off'); } catch (e) { /* ignore */ } },
 
   // ---------------- modals ----------------
-  showModal(html) { RT.modal = true; RT.keys = {}; $('modal-card').innerHTML = html; $('modal').classList.remove('hidden'); },
+  showModal(html) { RT.modal = true; RT.keys = {}; $('modal-card').innerHTML = html; $('modal').classList.remove('hidden'); stackWideTables($('modal-card')); },
   hideModal() { RT.modal = false; $('modal').classList.add('hidden'); },
 
   showWelcome() {

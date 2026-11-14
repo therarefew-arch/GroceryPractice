@@ -6,7 +6,11 @@ const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1380, NIGHT_END = 1740;
-const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
+const OT_PER_PALLET = 15, LABOR_TARGET = 12;
+// Levels get further apart: going from level L to L+1 takes 400 + 200·(L−1) XP (400 for the first).
+const xpForLevel = L => (L - 1) * 400 + 100 * (L - 1) * (L - 2); // total XP to reach level L
+function levelOf(xp) { let L = 1; while (xpForLevel(L + 1) <= xp) L++; return L; }
+const MAX_CREW = 14; // the building only holds so many associates
 const SAVE_KEY = 'groceryPractice.save.v1'; // the one save from before save slots (moved into slot 1)
 const SLOTS = 3;
 let SLOT = 1; // the save slot you're playing in
@@ -24,13 +28,13 @@ function migrateOldSave() {
     const old = localStorage.getItem(SAVE_KEY); if (!old) return;
     if (!localStorage.getItem(slotKey(1))) {
       localStorage.setItem(slotKey(1), old);
-      const s = JSON.parse(old), lv = 1 + Math.floor((s.xp || 0) / XP_PER_LEVEL);
+      const s = JSON.parse(old), lv = levelOf(s.xp || 0);
       localStorage.setItem(slotKey(1) + '.meta', JSON.stringify({ day: s.day, lvl: lv, title: TITLES[Math.min(TITLES.length - 1, lv - 1)], bank: s.bank || 0, at: Date.now() }));
     }
     localStorage.removeItem(SAVE_KEY);
   } catch (e) { /* ignore */ }
 }
-const VERSION = '0.0.37'; // bump the last number on every update
+const VERSION = '0.0.38'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -89,9 +93,9 @@ const canStock = dept => !coolerBlocked(dept) && DEPT[dept].capU - G.stock[dept]
 const endcapCount = dept => MAPD.endcaps.filter(e => G.endcaps[e.id] === dept && ecStockOf(e.id) > 0).length;
 const promoLift = dept => 1 + 0.12 * Math.min(2, endcapCount(dept));
 const crewName = id => (G.crew.find(c => c.id === id) || { name: 'Someone' }).name;
-const level = () => 1 + Math.floor(G.xp / XP_PER_LEVEL);
+const level = () => levelOf(G.xp);
 const title = () => TITLES[Math.min(TITLES.length - 1, level() - 1)];
-const maxCrew = () => 3 + level();
+const maxCrew = () => Math.min(MAX_CREW, 3 + level());
 
 function palletCases(dept) { let n = 0; for (const p of G.pallets) for (const c of p.cases) if (c.d === dept) n++; return n; }
 function truckRemaining() { return sum(G.pallets.map(p => p.cases.length)) + sum(G.floats.map(f => f.cases.length)); }
@@ -623,7 +627,7 @@ function buy(cu, dept) {
     t.misses++;
     countsOnOut(dept);
     t.lost[dept] = (t.lost[dept] || 0) + q;
-    G.sat = Math.max(0, G.sat - 0.7);
+    G.sat = Math.max(0, G.sat - 0.4);
     cu.emote = '!'; cu.emoteT = 2.5;
     if (!RT.outsWarned[dept] || G.time - RT.outsWarned[dept] > 60) {
       RT.outsWarned[dept] = G.time;
@@ -638,7 +642,7 @@ function buy(cu, dept) {
   if (!fromEc) s.shelf -= got;
   t.sales += got * d.price - (fromEc ? 0 : codesSold(dept, got, cu));
   t.units[dept] = (t.units[dept] || 0) + got;
-  G.sat = Math.min(100, G.sat + 0.06);
+  G.sat = Math.min(100, G.sat + 0.08);
   shopMess(dept, got, cu);
   countsOnBuy(dept, got);
   shelfDamage(dept, cu);
@@ -1018,7 +1022,7 @@ function updateCrew(dt, gm) {
     if (!r.plan) {
       if (!on) { r.intent = 'Clocking out'; r.plan = [{ go: () => [MAPD.staffDoor] }, { do: () => { r.inBuilding = false; return true; } }]; }
       else if (G.phase === 'day' && rollMistake(c, 'focus', 0.025)) { r.plan = [{ wait: 6, label: 'On their phone' }]; r.intent = 'On their phone 📱'; }
-      else r.plan = orderPlan(c, r) || coverPlan(c, r) || recoveryPlan(c, r) || brain(c, r) || helpPlan(c, r) || planIdle(c, r);
+      else r.plan = orderPlan(c, r) || coverPlan(c, r) || recoveryPlan(c, r) || ((G.trash || []).length >= 3 ? planTrash(c, r) : null) || brain(c, r) || helpPlan(c, r) || planTrash(c, r) || planIdle(c, r);
     }
     runPlan(c, r, dt);
     if (r.floatId) { const f = floatById(r.floatId); if (f) { f.x = r.x + r.fx * 0.6; f.y = r.y + r.fy * 0.6; } }
