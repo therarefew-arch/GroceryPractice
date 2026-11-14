@@ -35,7 +35,6 @@ const binItems = () => (G.damages || []).filter(d => d.where === 'bin');
 const binToScan = () => binItems().filter(d => !d.vendor);
 const binHeld = () => binItems().filter(d => d.vendor);
 const truckToClaim = () => (G.damages || []).concat(G.player.damages || []).filter(d => d.src === 'truck' && d.day === G.day);
-const dmgUnits = list => sum(list.map(d => d.units));
 
 function addDamage(dept, units, item, src, x, y, vendor) {
   const d = { id: nid(), dept, units, item, src, vendor: vendor || null, where: 'floor', x, y, at: G.time, day: G.day };

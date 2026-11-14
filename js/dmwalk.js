@@ -16,7 +16,6 @@ const DM_FIX_BY = 2;                  // follow-ups due this many days later, by
 const DM_FIX_TIME = 720;
 function ensureDm() { G.dm = G.dm || { next: 9 + randi(0, 3), walks: [] }; }
 const dmToday = () => (G.dm && G.dm.walks.find(w => w.day === G.day)) || null;
-const dmLast = () => (G.dm && G.dm.walks.length ? G.dm.walks[G.dm.walks.length - 1] : null);
 
 // What the DM looks at. Each check returns null (fine) or what they saw.
 const DM_CHECKS = [

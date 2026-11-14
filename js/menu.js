@@ -174,8 +174,7 @@ function advancedActions() {
   if (it && it.fn) out.push(['👆', it.label, it.fn]);
   if (it && it.alt && it.alt.fn) out.push(['↪', it.alt.label, it.alt.fn]);
   if (it && it.fn && it.rep) out.push(['🔁', `Keep going: ${it.label}`, () => { RT.autoRep = true; toast('🔁 Keep going. Move to stop.', 'info'); }]);
-  let near = null, nd = 3.5;
-  for (const c of G.crew) { const r = RT.crew[c.id]; if (!r || !r.inBuilding) continue; const d = Math.hypot(r.x - p.x, r.y - p.y); if (d < nd) { nd = d; near = c; } }
+  const near = crewNear(p, 3.5);
   if (near) out.push(['📌', `Give ${near.name} orders`, () => showOrders(near)]);
   if (RT.autoRep) out.push(['⏹', 'Stop repeating', () => { RT.autoRep = false; }]);
   out.push(['💾', `Save game (slot ${SLOT})`, () => saveToSlot(SLOT)]);

@@ -18,7 +18,6 @@
 const EC_CASES = 6;       // cases an endcap holds
 const EC_SHARE = 0.10;    // share of a department's shoppers who take it off the endcap
 const ecCap = dept => EC_CASES * DEPT[dept].upc;
-const ecOf = id => MAPD.endcaps.find(e => e.id === id);
 const ecStockOf = id => (G.ecStock && G.ecStock[id]) || 0;
 const ecCenter = e => ({ x: e.x + 0.5, y: e.y + 0.5 });
 const ecName = e => `${DEPT[SHELF_DEPT[e.gondola]].aisle} ${e.end.toLowerCase()} endcap`;

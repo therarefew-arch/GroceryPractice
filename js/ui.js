@@ -436,8 +436,6 @@ const UI = {
     return h;
   },
   interview(id) { startInterview(id); const k = G.candidates.find(x => x.id === id); if (k && k.iv) { this.ivId = id; this.render(); ivsOpen(id); } else this.render(); },
-  ivAsk(id, q) { askQuestion(id, q); this.render();
-  },
   hire(id) {
     if (G.crew.length >= maxCrew()) return;
     const k = G.candidates.find(x => x.id === id);
@@ -607,10 +605,6 @@ const UI = {
       <p class="mute">You're on the schedule: you open today (5 AM to 2 PM). When your shift ends you can go home and the crew runs the rest of the day.</p>
       <p class="mute">Tip: Dairy & Frozen pallets (blue outline) spoil if they sit. Work cold first.</p>
       <div class="row" style="justify-content:flex-end"><button class="primary" onclick="UI.hideModal()">Clock in for Day 1 →</button></div>`);
-  },
-  showContinue() {
-    this.showModal(`<h2>Welcome back</h2><p>${dayLabel(G.day)} · Level ${level()} ${title()} · Career bonus ${money(G.bank)}</p>
-      <div class="row" style="justify-content:flex-end"><button class="danger" onclick="UI.newGameConfirm()">Start over</button><button class="primary" onclick="UI.hideModal(); if (G.phase === 'summary') UI.showSummary(G.lastResult);">Continue</button></div>`);
   },
   // In-game yes/no box (the browser's confirm() pop-up is blocked in some embedded browsers).
   ask(title, body, yes, onYes, danger, no) {

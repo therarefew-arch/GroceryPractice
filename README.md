@@ -1,6 +1,6 @@
 # Grocery Practice
 
-**Version 0.0.38**
+**Version 0.0.39**
 
 A 2D grocery store manager simulator for practicing the real job: receiving the night truck, building floats, working freight, keeping the shelves full, running the crew, and ordering for tomorrow. All without blowing the labor budget.
 
@@ -133,7 +133,10 @@ Everything store-specific lives in [`js/data.js`](js/data.js): departments/aisle
 |---|---|
 | `js/data.js` | Store data you can edit |
 | `js/map.js` | Floor plan and pathfinding |
-| `js/game.js` | Simulation: day/night cycle, crew AI, customers, vendors, player, saving |
+| `js/game.js` | Simulation: day/night cycle, results, customers, vendors, levels |
+| `js/crew.js` | Crew AI: movement and the plans each associate runs |
+| `js/player.js` | The player: moving, what E does where you stand, your own work |
+| `js/save.js` | Save slots, save / load, the game loop and boot |
 | `js/render.js` | Canvas drawing and the zoom camera |
 | `js/training.js` | Crew mistakes, coaching, ranks, mentoring, cardboard trash |
 | `js/fx.js` | Sound effects, combos, confetti, minimap, worker hover info |
