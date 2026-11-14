@@ -85,6 +85,7 @@ function buildWeekReview(week) {
 
   laborReviewNotes(days, note, praise);
   successorReviewNotes(days, note, praise);
+  standardsReviewNotes(days, note, praise);
   backroomReviewNotes(days, note); facingReviewNotes(days, note, praise); countsReviewNotes(days, note, praise); damagesReviewNotes(days, note, praise); cutsReviewNotes(days, note, praise); recallsReviewNotes(days, note, praise); resetsReviewNotes(days, note, praise); endcapsReviewNotes(days, note, praise); timeoffReviewNotes(days, note, praise); interviewReviewNotes(days, note, praise); huddleReviewNotes(days, note, praise); perfReviewNotes(days, note, praise); custReviewNotes(days, note, praise); weatherReviewNotes(days, note, praise); pnlReviewNotes(days, note, praise); repsReviewNotes(days, note, praise); dmReviewNotes(days, note, praise); discReviewNotes(days, note, praise);
   if (truckDays.length && truckNoon < truckDays.length) note('Truck', `The truck was worked by noon on ${truckNoon} of ${truckDays.length} truck days.`,
     'Freight still out at noon blocks the aisles during the busiest hours, cold product loses life every hour it sits, and backstock never gets run.',

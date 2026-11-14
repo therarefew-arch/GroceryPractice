@@ -55,6 +55,7 @@ function holdHuddle(key, shoutId) {
     const r = RT.crew[c.id];
     if (r) { finishPlan(c, r); r.intent = 'Morning huddle'; r.plan = [{ go: () => tilesAround(HUDDLE_SPOT, 2) }, { wait: HUDDLE_MIN, label: 'Morning huddle' }]; }
   }
+  stdHuddle(crew);
   const sc = G.crew.find(c => c.id === +shoutId);
   if (sc) {
     sc.praisedDay = G.day; sc.lastPraised = G.day; bump(sc, 10, 'praised'); G.today.huddle.shout = sc.name;

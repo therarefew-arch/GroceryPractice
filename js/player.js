@@ -140,7 +140,7 @@ function getInteraction() {
   const coachee = G.crew.find(c => c.needsCoach && RT.crew[c.id] && RT.crew[c.id].inBuilding && dist(RT.crew[c.id], p) < 1.5);
   if (coachee && !p.work) return { label: `Coach ${coachee.name}: ${TRAIN_AREAS[coachee.needsCoach.area].mistake}`, fn: () => { const rr = RT.crew[coachee.id]; if (rr) rr.hold = 2.5; startWork(2.5, 'Coaching', () => coachCrew(coachee)); }, at: RT.crew[coachee.id] };
   const dvi = !p.work && devInteraction(p);
-  if (dvi) return dvi;
+  if (dvi) { const s2 = standardsInteraction(p); return s2 ? { ...dvi, alt: s2 } : dvi; }
   const trash = nearest(G.trash || [], p, 1.3);
   if (trash) return { label: 'Pick up the cardboard', fn: () => pickUpTrash(trash), at: trash, rep: true };
   if (p.gobacks && p.gobacks.length) { const gi = gobackInteraction(p, shelfDept, shelf); if (gi) return gi; }
@@ -215,7 +215,9 @@ function getInteraction() {
   if (fi) return mi ? { ...fi, alt: mi } : fi;
   const sw = !p.work && !mi && backroomInteraction(p, true);
   if (sw) return sw;
-  if (mi) return mi;
+  const sti = !p.work && standardsInteraction(p);
+  if (mi) return sti ? { ...mi, alt: sti } : mi;
+  if (sti) return sti;
   const door = { x: MAPD.staffDoor.x + 0.5, y: MAPD.staffDoor.y + 0.5 };
   if (dist(door, p) < 1.2) return { label: 'Clock out and go home', fn: () => askGoHome(), at: door };
   if (shelfDept) return { label: `${DEPT[shelfDept].aisle} · ${DEPT[shelfDept].name}: shelf ${Math.round(shelfPct(shelfDept) * 100)}% full · ${Math.round(faceOf(shelfDept))}% faced${p.gobacks && p.gobacks.length ? ` · none of your go-backs go here (${gbSummary(p.gobacks)})` : ''}`, fn: null };

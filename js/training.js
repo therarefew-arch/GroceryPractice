@@ -59,7 +59,7 @@ const isStar = c => crewRank(c).key === 'star';
 function rollMistake(c, area, base) {
   ensureTrain(c);
   if (isStar(c)) return false;
-  const p = base * huddleMistakeMult(area) * (1 - c.train[area] / 100);
+  const p = base * huddleMistakeMult(area) * stdMistakeMult(c, area) * (1 - c.train[area] / 100);
   if (Math.random() >= p) return false;
   c.mistakes++;
   if (G.today) G.today.crewMistakes = (G.today.crewMistakes || 0) + 1;

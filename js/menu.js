@@ -179,6 +179,7 @@ function advancedActions() {
   if (it && it.fn && it.rep) out.push(['🔁', `Keep going: ${it.label}`, () => { RT.autoRep = true; toast('🔁 Keep going. Move to stop.', 'info'); }]);
   const near = crewNear(p, 3.5);
   if (near) out.push(['📌', `Give ${near.name} orders`, () => showOrders(near)]);
+  if (near && (G.standards || []).length) out.push(['📏', `Talk standards with ${near.name}`, () => UI.stdCoach(near.id)]);
   if (RT.autoRep) out.push(['⏹', 'Stop repeating', () => { RT.autoRep = false; }]);
   out.push(['💾', `Save game (slot ${SLOT})`, () => saveToSlot(SLOT)]);
   if (!$('btn-home').classList.contains('hidden')) out.push(['🏠', 'Clock out and go home', () => askGoHome()]);

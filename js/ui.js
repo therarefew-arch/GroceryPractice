@@ -126,7 +126,7 @@ const UI = {
     const main = this['tab_' + this.tab]();
     const unread = G.emails.filter(m => !m.read).length;
     const tabs = [['today', '📋 Today'], ['dash', '📊 Reports'], ['mail', `📧 Email${unread ? ` (${unread})` : ''}`], ['crew', '👥 Crew'], ['sched', `🗓 Schedule${dowOf(G.day) === 'Thu' && G.sched && G.sched[weekOf(G.day) + 1] && !G.sched[weekOf(G.day) + 1].posted ? ' (!)' : ''}`], ['labor', `📑 Labor${forecastOpen() ? ' (!)' : ''}`], ['hire', '🤝 Hiring'], ['pnl', `📒 P&L${(G.pnl || []).length && !G.pnl[G.pnl.length - 1].plan ? ' (!)' : ''}`],
-      ['display', '🏷️ Display Planner'], ['order', '📈 Forecast & Order'], ['counts', `🔢 Counts${countsToday().some(k => k.status === 'open') ? ` (${countsToday().filter(k => k.status === 'open').length})` : ''}`], ['sir', `🛒 Special Items${(G.sirs || []).some(s => s.status === 'open') ? ' (!)' : ''}`], ['layout', '🧱 Backroom Layout'], ['records', '🏆 Records'], ['help', '❓ Help & Settings']];
+      ['standards', '📏 Standards'], ['display', '🏷️ Display Planner'], ['order', '📈 Forecast & Order'], ['counts', `🔢 Counts${countsToday().some(k => k.status === 'open') ? ` (${countsToday().filter(k => k.status === 'open').length})` : ''}`], ['sir', `🛒 Special Items${(G.sirs || []).some(s => s.status === 'open') ? ' (!)' : ''}`], ['layout', '🧱 Backroom Layout'], ['records', '🏆 Records'], ['help', '❓ Help & Settings']];
     $('pc-tabs').innerHTML = tabs.map(([k, l]) => `<button class="${this.tab === k ? 'on' : ''}" onclick="UI.setTab('${k}')">${l}</button>`).join('') +
       `<div style="flex:1"></div><div class="mute" style="font-size:12px;padding:6px">The clock is paused while you're logged in.</div>`;
     $('pc-main').innerHTML = main;
