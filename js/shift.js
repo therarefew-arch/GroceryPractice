@@ -44,6 +44,7 @@ function clockOut(quiet) {
   const p = G.player;
   if (p.away) return;
   if (p.carry.length) playerCarryToBack();
+  ecDropLoad(p);
   if (p.floatId) releaseFloat(true);
   if (p.birdId) releaseBird(false);
   if (p.gobacks && p.gobacks.length) playerDropGobacks();

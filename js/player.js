@@ -112,6 +112,7 @@ function getInteraction() {
   const shelfDept = shelf ? SHELF_DEPT[shelf.ch] : null;
   const bird = nearest(birdList(), p, 1.45, b => !b.carriedBy);
 
+  if (p.ecLoad) return ecLoadInteraction(p);
   if (p.pallet) {
     if (inRecv(p)) return { label: 'Drop pallet in Receiving', fn: playerDropPallet };
     return { label: 'Bring the pallet to the yellow RECEIVING area', fn: null };
@@ -190,6 +191,8 @@ function getInteraction() {
     if (fl.claimedBy) return { label: `${crewName(fl.claimedBy)} is about to push this float`, fn: null };
     return { label: `Push the ${DEPT[fl.dept].name} float (${plural(fl.cases.length, 'case')})`, fn: () => grabFloat(fl), at: fl };
   }
+  const epi = !p.work && ecPullInteraction(p, bird);
+  if (epi) return epi.fn ? { ...epi, alt: { label: 'Push the bird', fn: () => grabBird(bird) } } : epi;
   if (bird) {
     const n = backCases(bird.dept), d = DEPT[bird.dept];
     const push = { label: `Push the ${d.aisle} bird (${plural(n, 'case')})`, fn: () => grabBird(bird), at: bird };

@@ -11,7 +11,7 @@ const OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const xpForLevel = L => (L - 1) * 400 + 100 * (L - 1) * (L - 2); // total XP to reach level L
 function levelOf(xp) { let L = 1; while (xpForLevel(L + 1) <= xp) L++; return L; }
 const MAX_CREW = 14; // the building only holds so many associates
-const VERSION = '0.0.39'; // bump the last number on every update
+const VERSION = '0.0.40'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -69,6 +69,14 @@ const canStock = dept => !coolerBlocked(dept) && DEPT[dept].capU - G.stock[dept]
 // only a display with product on it counts (js/endcaps.js)
 const endcapCount = dept => MAPD.endcaps.filter(e => G.endcaps[e.id] === dept && ecStockOf(e.id) > 0).length;
 const promoLift = dept => 1 + 0.12 * Math.min(2, endcapCount(dept));
+// The weekly ad (Wednesday to Tuesday): customers come in for the deal, so ad departments sell faster.
+const AD_LIFT = 1.3;
+function adFor(day) { // the ad departments running on that day (next week's set once Wednesday comes)
+  if (G.nextAd && day > G.day && day - G.day < 7 && !['Mon', 'Tue'].includes(dowOf(day))) return G.nextAd;
+  return G.ad ? G.ad.depts : [];
+}
+const onAd = (dept, day = G.day) => adFor(day).includes(dept);
+const adLift = (dept, day = G.day) => (onAd(dept, day) ? AD_LIFT : 1);
 const crewName = id => (G.crew.find(c => c.id === id) || { name: 'Someone' }).name;
 const level = () => levelOf(G.xp);
 const title = () => TITLES[Math.min(TITLES.length - 1, level() - 1)];
@@ -109,8 +117,8 @@ function trafficRemaining(t) {
   return rem / TRAFFIC_SUM;
 }
 function avgDemand(dept) { const h = G.history[dept].slice(-7); return sum(h) / h.length; }
-function forecastUnits(dept) { return avgDemand(dept) * promoLift(dept); }
-function forecastFor(dept, day) { return forecastUnits(dept) * dowFactor(day); }
+function forecastUnits(dept, day = G.day) { return avgDemand(dept) * promoLift(dept) * adLift(dept, day); }
+function forecastFor(dept, day) { return forecastUnits(dept, day) * dowFactor(day); }
 function dsdUnits(dept) { return sum(VENDORS.filter(v => v.dept === dept).map(v => v.cases * DEPT[dept].upc)); }
 function suggestedCases(dept, td) {
   td = td || nextTruckDay(G.day);
@@ -289,7 +297,7 @@ function startDay() {
   if (dowNow === 'Mon') {
     G.nextAd = shuffle(DEPTS.map(d => d.id)).slice(0, 2);
     mail('District Manager', `Next ad chart: ${G.nextAd.map(d => DEPT[d].name).join(' & ')}`,
-      `The new ad starts Wednesday. Plan the new set today in the Display Planner (2 endcaps each for ${G.nextAd.map(d => DEPT[d].name).join(' and ')}), and order extra on tonight's truck: each endcap holds ${EC_CASES} cases, built from backstock. The closing crew flips the endcaps Tuesday from 6 PM; verify it Wednesday morning.\nEndcaps lift sales, but only while there's product on them and the shelves behind them stay full.`);
+      `The new ad starts Wednesday. Plan the new set today in the Display Planner (2 endcaps each for ${G.nextAd.map(d => DEPT[d].name).join(' and ')}), and order extra on tonight's truck: each endcap holds ${EC_CASES} cases, built from backstock. Tuesday from 6 PM the closing crew flips the endcaps: take each old display down and put its product back on its bird, then pull the new product off its bird and build the display. Verify it Wednesday morning.\nAd items sell about ${Math.round((AD_LIFT - 1) * 100)}% faster all week, and an out on the ad costs us twice. Endcaps lift sales too, but only while there's product on them and the shelves behind them stay full.`);
   }
   if (dowNow === 'Wed' && G.nextAd) {
     G.ad = { depts: G.nextAd, from: G.day }; G.nextAd = null;
@@ -553,7 +561,7 @@ function spawnCustomers(gm) {
 function spawnCustomer() {
   const n = randi(2, 4), stops = [], pool = DEPTS.slice();
   for (let i = 0; i < n && pool.length; i++) {
-    const d = wpick(pool, x => x.demand * x.upc * promoLift(x.id) * catalogFactor(x.id) * seasonLift(x.id, G.day) * wxLift(x.id, G.day) * repLift(x.id, G.day));
+    const d = wpick(pool, x => x.demand * x.upc * promoLift(x.id) * adLift(x.id) * catalogFactor(x.id) * seasonLift(x.id, G.day) * wxLift(x.id, G.day) * repLift(x.id, G.day));
     stops.push(d.id); pool.splice(pool.indexOf(d), 1);
   }
   const door = pick(MAPD.frontDoor);
@@ -593,7 +601,7 @@ function updateCustomers(dt) {
 function buy(cu, dept) {
   const d = DEPT[dept], s = G.stock[dept], t = G.today;
   let q = randi(1, 3) + (endcapCount(dept) && Math.random() < 0.3 ? 1 : 0);
-  const sl = seasonLift(dept, G.day) * wxLift(dept, G.day) * repLift(dept, G.day);
+  const sl = seasonLift(dept, G.day) * wxLift(dept, G.day) * repLift(dept, G.day) * adLift(dept);
   if (sl > 1 && Math.random() < Math.min(1, (sl - 1) * 1.6)) q++;
   t.requests++;
   t.demand[dept] = (t.demand[dept] || 0) + q;
@@ -604,11 +612,12 @@ function buy(cu, dept) {
     t.misses++;
     countsOnOut(dept);
     t.lost[dept] = (t.lost[dept] || 0) + q;
-    G.sat = Math.max(0, G.sat - 0.4);
+    G.sat = Math.max(0, G.sat - (onAd(dept) ? 0.8 : 0.4)); // an out on an ad item: they came in for that
+    if (onAd(dept)) t.adOuts = (t.adOuts || 0) + 1;
     cu.emote = '!'; cu.emoteT = 2.5;
     if (!RT.outsWarned[dept] || G.time - RT.outsWarned[dept] > 60) {
       RT.outsWarned[dept] = G.time;
-      toast(`OUT OF STOCK: ${d.name}! Customers are walking away empty-handed.`, 'bad');
+      toast(onAd(dept) ? `OUT OF STOCK on an AD item: ${d.name}! They came in for the deal and found an empty shelf.` : `OUT OF STOCK: ${d.name}! Customers are walking away empty-handed.`, 'bad');
     }
     return;
   }

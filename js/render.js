@@ -420,6 +420,18 @@ function drawCarry(x, y, carry) {
     ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.strokeRect(bx + 0.5, by + 0.5, 11, 7);
   });
 }
+// display product on a flat cart: one box per case, up to 6
+function drawEcLoad(x, y, l) {
+  const n = Math.min(EC_CASES, ecCases(l.dept, l.units)), bx = Math.round(x * T - 10), by = Math.round(y * T - 22);
+  ctx.fillStyle = '#2b2f36'; ctx.fillRect(bx - 1, by + 9, 22, 2);
+  for (let i = 0; i < n; i++) {
+    const cx = bx + (i % 3) * 7, cy = by + 3 - Math.floor(i / 3) * 6;
+    ctx.fillStyle = DEPT[l.dept].color; ctx.fillRect(cx, cy, 6, 6);
+    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(cx, cy, 6, 1);
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.strokeRect(cx + 0.5, cy + 0.5, 5, 5);
+  }
+  if (l.kind === 'down') { ctx.fillStyle = '#ccc'; ctx.fillRect(bx + 21, by + 2, 2, 8); }
+}
 function drawProgress(x, y, p) {
   const bx = Math.round(x * T - 12), by = Math.round(y * T + 15);
   ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(bx - 1, by - 1, 26, 6);
@@ -437,6 +449,7 @@ function drawCrew(c, r) {
   if (G.conflict && (G.conflict.a === c.id || G.conflict.b === c.id)) drawArgueBubble(r, top);
   else if (c.needsCoach) drawCoachBubble(r, top);
   if (r.carry.length) drawCarry(r.x, r.y - 0.1, r.carry.slice(0, 4));
+  if (r.ecLoad) drawEcLoad(r.x, r.y - 0.1, r.ecLoad);
   if (r.progress > 0) drawProgress(r.x, r.y, r.progress);
 }
 
@@ -476,6 +489,7 @@ function drawPlayer() {
   const top = pixelPerson(p, '#1e6fd9', { seed: 7, ring: '#ffd34d', vest: '#ffd34d' });
   nameplate(ctx, 'YOU', p.x * T, top - 9, { font: PX(8), h: 12, edge: '#ffd34d', color: '#ffe9a0', bg: '#2a2208' });
   if (p.carry.length) drawCarry(p.x, p.y, p.carry);
+  if (p.ecLoad) drawEcLoad(p.x, p.y, p.ecLoad);
   if (p.work) drawProgress(p.x, p.y + 0.15, p.work.t / p.work.dur);
 }
 
