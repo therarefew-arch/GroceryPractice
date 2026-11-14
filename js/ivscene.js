@@ -173,14 +173,15 @@ function drawIvScene(g, k, now) {
   g.fillStyle = 'rgba(0,0,0,0.12)'; for (let y = 0; y < IVS_H; y += 3) g.fillRect(0, y, IVS_W, 1);
 }
 
-function drawApplicant(g, R, k, now, t) {
-  const L = ivsLook(k), mood = IVS.mood;
+// S is the scene state (mood, talkUntil); S.vest draws a store vest instead of the visitor sticker (js/talkscene.js)
+function drawApplicant(g, R, k, now, t, S = IVS) {
+  const L = ivsLook(k), mood = S.mood;
   const breathe = Math.sin(t * 2.2) > 0.6 ? 1 : 0;
   const lean = mood === 'excited' ? 2 : mood === 'negative' || mood === 'upset' ? -1 : 0; // forward = lower and bigger
   const bx = 96, by = 22 + lean + breathe;
   const fid = mood === 'nervous' || mood === 'lying' ? Math.round(Math.sin(t * 9)) : 0;
   // chair back
-  R(76, 48, 40, 40, '#14181d'); R(78, 50, 36, 36, '#1d2127');
+  if (!S.vest) { R(76, 48, 40, 40, '#14181d'); R(78, 50, 36, 36, '#1d2127'); }
   // shoulders + shirt
   const sh = L.shirt;
   R(bx - 20, by + 36, 40, 30, sh); R(bx - 22, by + 40, 44, 26, sh);
@@ -244,7 +245,7 @@ function drawApplicant(g, R, k, now, t) {
   R(hx + 11, ey + 5, 2, 4, 'rgba(0,0,0,0.15)'); R(hx + 11, ey + 8, 3, 1, 'rgba(0,0,0,0.2)');
   // mouth
   const my = hy + 24, mx = hx + 8, M = '#5a1f1f';
-  const talking = performance.now() < IVS.talkUntil && Math.floor(t * 10) % 2 === 0;
+  const talking = performance.now() < S.talkUntil && Math.floor(t * 10) % 2 === 0;
   if (talking && mood !== 'negative') { R(mx + 1, my - 1, 6, 3, M); R(mx + 2, my - 1, 4, 1, '#f4f4f4'); }
   else ({
     neutral: () => R(mx + 1, my, 6, 1, M),
@@ -265,6 +266,11 @@ function drawApplicant(g, R, k, now, t) {
     R(bx + 6, by + 28, 8, 6, L.skin); R(bx + 6, by + 33, 8, 1, 'rgba(0,0,0,0.25)');
   }
   if (mood === 'upset') { g.globalAlpha = 0.18; R(hx, hy, 24, 31, '#9fc8e6'); g.globalAlpha = 1; }
-  // applicant badge (visitor sticker)
-  R(bx - 18, by + 44, 12, 7, '#ffe6b8'); R(bx - 18, by + 44, 12, 2, '#ff5a4e'); R(bx - 16, by + 48, 8, 1, 'rgba(0,0,0,0.4)');
+  if (S.vest) { // store vest and name tag
+    R(bx - 22, by + 38, 13, 28, S.vest); R(bx + 9, by + 38, 13, 28, S.vest);
+    R(bx - 22, by + 38, 13, 1, 'rgba(255,255,255,0.3)'); R(bx + 9, by + 38, 13, 1, 'rgba(255,255,255,0.3)');
+    R(bx + 11, by + 44, 9, 5, '#f4f4f4'); R(bx + 12, by + 46, 7, 1, 'rgba(0,0,0,0.45)');
+  } else { // applicant badge (visitor sticker)
+    R(bx - 18, by + 44, 12, 7, '#ffe6b8'); R(bx - 18, by + 44, 12, 2, '#ff5a4e'); R(bx - 16, by + 48, 8, 1, 'rgba(0,0,0,0.4)');
+  }
 }

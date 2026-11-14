@@ -62,7 +62,7 @@ function ownerInteraction(p) {
   if (!c || !onShift(c) || c.ownWalkDay === G.day) return null;
   const d = ownsOf(c).filter(x => aisleScore(x) < 75 || (aisleToday(x) || 100) < 70).sort((a, b) => aisleScore(a) - aisleScore(b))[0];
   if (!d) return null;
-  return { label: `🏷 Walk ${DEPT[d].aisle} with ${c.name} (their aisle: ${aisleScore(d)}%)`, fn: () => startWork(4, 'Walking the aisle', () => ownerWalk(c, d)) };
+  return { label: `🏷 Walk ${DEPT[d].aisle} with ${c.name} (their aisle: ${aisleScore(d)}%)`, fn: () => talkOpen(c, 'aisle', d) };
 }
 function ownerWalk(c, d) {
   c.ownWalkDay = G.day; c.ownFocusUntil = G.day + 1;

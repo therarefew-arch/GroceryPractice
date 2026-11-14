@@ -111,7 +111,7 @@ function standardsInteraction(p) {
   if (!(G.standards || []).length) return null;
   const c = crewNear(p, 1.6);
   if (!c || !onShift(c)) return null;
-  return { label: `📏 Talk standards with ${c.name}`, fn: () => UI.stdCoach(c.id) };
+  return { label: `📏 Talk standards with ${c.name}`, fn: () => talkOpen(c, 'std') };
 }
 
 // ---- the crew actually doing it ----
@@ -223,6 +223,7 @@ UI.stdRemove = function (id) { stdRemove(id); this.render(); };
 UI.stdGather = function (id) { stdGather(id); this.render(); };
 UI.stdCoach = function (id) {
   const c = G.crew.find(x => x.id === id); if (!c) return;
+  if (onShift(c) && RT.crew[c.id] && RT.crew[c.id].inBuilding) return talkOpen(c, 'std'); // in person: the talk scene (js/talkscene.js)
   const st = G.standards || [];
   this.showModal(`<h2>📏 Standards: ${esc(c.name)}</h2><p class="mute">Pick one to talk through (once a day each). ${c.morale < 40 ? '<span class="warn">Their morale is low: it won\'t land as well.</span>' : ''}</p>` +
     (st.length ? st.map(s => { const v = Math.round(stdOf(c, s.id)), done = c.stdTalkDay && c.stdTalkDay[s.id] === G.day; return `<button style="display:block;width:100%;text-align:left;margin:6px 0;padding:8px" ${done ? 'disabled' : ''} onclick="UI.stdTalk(${c.id},${s.id})"><b>${STD_KINDS[s.kind].icon} ${esc(stdName(s))}</b> <span class="${v >= 60 ? 'good' : 'warn'}">${v}% bought in</span>${done ? ' · talked today' : ''}<div class="mute" style="font-size:12px">Why: ${esc(STD_KINDS[s.kind].why)}</div></button>`; }).join('') : '<p>No store standards yet. Set them on the office computer (📏 Standards).</p>') +

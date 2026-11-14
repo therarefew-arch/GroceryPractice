@@ -24,6 +24,7 @@ const UI = {
     window.addEventListener('resize', fit);
     window.addEventListener('keydown', e => {
       if (IVS.id != null) { if (e.key === 'Escape') ivsClose(); return; }
+      if (TS.c) { if (e.key === 'Escape') talkClose(); return; }
       if (this.open) { if (e.key === 'Escape') this.closeComputer(); return; }
       if (RT.modal || !G) return;
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();

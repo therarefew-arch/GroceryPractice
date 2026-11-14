@@ -11,7 +11,7 @@ const OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const xpForLevel = L => (L - 1) * 400 + 100 * (L - 1) * (L - 2); // total XP to reach level L
 function levelOf(xp) { let L = 1; while (xpForLevel(L + 1) <= xp) L++; return L; }
 const MAX_CREW = 14; // the building only holds so many associates
-const VERSION = '0.0.45'; // bump the last number on every update
+const VERSION = '0.0.46'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map

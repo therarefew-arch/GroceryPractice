@@ -159,8 +159,8 @@ body.touch .toast { font-size: 15px; padding: 4px 8px; }
 body.touch .away-card { font-size: 14px; padding: 6px 8px; }
 
 /* Interview scene (js/ivscene.js) */
-#ivscene { position: fixed; inset: 0; background: #000d; display: flex; align-items: center; justify-content: center; z-index: 25; padding: 8px; }
-#ivscene.hidden { display: none; }
+#ivscene, #tscene { position: fixed; inset: 0; background: #000d; display: flex; align-items: center; justify-content: center; z-index: 25; padding: 8px; }
+#ivscene.hidden, #tscene.hidden { display: none; }
 .ivs-card { position: relative; width: min(760px, 100%); max-height: 100%; overflow-y: auto; background: #0f0c08; border: 2px solid #c98a2a; box-shadow: 0 0 0 4px #1a140b, 0 0 0 5px #5a4220, 0 0 40px #ffb23840; padding: 10px; }
 .ivs-top { display: flex; align-items: center; gap: 10px; font: 700 11px var(--pix); color: var(--mute); margin-bottom: 8px; }
 .ivs-top span:first-child { flex: 1; color: var(--acc); }

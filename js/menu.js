@@ -19,7 +19,7 @@ function showTitle(view) {
   if (G && (G.phase === 'day' || G.phase === 'night')) save();
   G = null; RT.keys = {};
   if (UI.open) UI.closeComputer();
-  UI.hideModal(); if (IVS.id != null) ivsClose();
+  UI.hideModal(); if (IVS.id != null) ivsClose(); if (TS.c) talkClose();
   let el = $('title');
   if (!el) { el = document.createElement('div'); el.id = 'title'; document.body.appendChild(el); }
   try { el.style.setProperty('--bgimg', `url(${BG.toDataURL()})`); } catch (e) { /* ignore */ }

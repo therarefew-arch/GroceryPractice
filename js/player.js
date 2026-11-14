@@ -138,7 +138,7 @@ function getInteraction() {
   const ev = !p.work && eventsInteraction(p, shelfDept, true);
   if (ev) return ev;
   const coachee = G.crew.find(c => c.needsCoach && RT.crew[c.id] && RT.crew[c.id].inBuilding && dist(RT.crew[c.id], p) < 1.5);
-  if (coachee && !p.work) return { label: `Coach ${coachee.name}: ${TRAIN_AREAS[coachee.needsCoach.area].mistake}`, fn: () => { const rr = RT.crew[coachee.id]; if (rr) rr.hold = 2.5; startWork(2.5, 'Coaching', () => coachCrew(coachee)); }, at: RT.crew[coachee.id] };
+  if (coachee && !p.work) return { label: `Coach ${coachee.name}: ${TRAIN_AREAS[coachee.needsCoach.area].mistake}`, fn: () => talkOpen(coachee, 'coach'), at: RT.crew[coachee.id] };
   const dvi = !p.work && devInteraction(p);
   if (dvi) { const s2 = standardsInteraction(p); return s2 ? { ...dvi, alt: s2 } : dvi; }
   const trash = nearest(G.trash || [], p, 1.3);

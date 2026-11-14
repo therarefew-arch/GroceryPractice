@@ -75,7 +75,7 @@ function devInteraction(p) {
   if (!c || G.dev.talkDay === G.day || !r || !r.inBuilding || !onShift(c) || dist(r, p) > 1.5) return null;
   const tk = G.dev.task && G.dev.task.day === G.day ? DEV_TASKS[G.dev.task.k] : null;
   const what = G.dev.debrief ? 'debrief yesterday' : tk ? `set them up for "${tk.name}"` : 'where they want to grow';
-  return { label: `🌱 Development talk with ${c.name} (${what})`, fn: () => startWork(3, 'Development talk', () => devTalk(c)) };
+  return { label: `🌱 Development talk with ${c.name} (${what})`, fn: () => talkOpen(c, 'dev') };
 }
 function devTalk(c) {
   const d = G.dev; d.talkDay = G.day;
