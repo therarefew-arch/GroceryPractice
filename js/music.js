@@ -51,7 +51,7 @@ function musicPick(night) {
   MUSIC.track = pick(pool.length ? pool : MUSIC_TRACKS);
   MUSIC.step = 0; MUSIC.barsLeft = 48 + randi(0, 16);
   const ac = FX.ac; if (MUSIC.del) MUSIC.del.delayTime.setValueAtTime(60 / MUSIC.track.bpm * 0.75, ac.currentTime);
-  if (G && musicWanted()) toast(`♪ Now playing: ${MUSIC.track.name}`, 'music');
+  if (G && musicWanted() && MUSIC.toasts !== false) toast(`♪ Now playing: ${MUSIC.track.name}`, 'music');
 }
 function musicTick() {
   const ac = FX.ac; if (!ac || !MUSIC.out) return;
@@ -145,7 +145,7 @@ function toggleMusic() {
   MUSIC.on = !MUSIC.on;
   try { localStorage.setItem('groceryPractice.music', MUSIC.on ? '1' : '0'); } catch (e) { /* ignore */ }
   musicButton();
-  if (MUSIC.on) { sfxInit(); if (MUSIC.track && !FX.muted) toast(`♪ Now playing: ${MUSIC.track.name}`, 'music'); }
+  if (MUSIC.on) { sfxInit(); if (MUSIC.track && !FX.muted && MUSIC.toasts !== false) toast(`♪ Now playing: ${MUSIC.track.name}`, 'music'); }
 }
 function musicButton() {
   const b = document.getElementById('btn-music'); if (!b) return;

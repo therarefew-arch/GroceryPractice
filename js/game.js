@@ -7,8 +7,30 @@ const ctx = canvas.getContext('2d');
 const FLOAT_CAP = 40, CARRY_CAP = 3, PALLET_SIZE = 36;
 const OPEN = 420, CLOSE = 1380, NIGHT_END = 1740;
 const XP_PER_LEVEL = 400, OT_PER_PALLET = 15, LABOR_TARGET = 12;
-const SAVE_KEY = 'groceryPractice.save.v1';
-const VERSION = '0.0.36'; // bump the last number on every update
+const SAVE_KEY = 'groceryPractice.save.v1'; // the one save from before save slots (moved into slot 1)
+const SLOTS = 3;
+let SLOT = 1; // the save slot you're playing in
+const slotKey = n => 'groceryPractice.slot' + n;
+function slotMeta(n) {
+  try {
+    const m = localStorage.getItem(slotKey(n) + '.meta'); if (m) return JSON.parse(m);
+    if (localStorage.getItem(slotKey(n))) return { day: null, at: 0 };
+  } catch (e) { /* ignore */ }
+  return null;
+}
+function clearSlot(n) { try { localStorage.removeItem(slotKey(n)); localStorage.removeItem(slotKey(n) + '.meta'); } catch (e) { /* ignore */ } }
+function migrateOldSave() {
+  try {
+    const old = localStorage.getItem(SAVE_KEY); if (!old) return;
+    if (!localStorage.getItem(slotKey(1))) {
+      localStorage.setItem(slotKey(1), old);
+      const s = JSON.parse(old), lv = 1 + Math.floor((s.xp || 0) / XP_PER_LEVEL);
+      localStorage.setItem(slotKey(1) + '.meta', JSON.stringify({ day: s.day, lvl: lv, title: TITLES[Math.min(TITLES.length - 1, lv - 1)], bank: s.bank || 0, at: Date.now() }));
+    }
+    localStorage.removeItem(SAVE_KEY);
+  } catch (e) { /* ignore */ }
+}
+const VERSION = '0.0.37'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -1054,14 +1076,21 @@ function movePlayer(p, mx, my) {
   }
 }
 // Hold E (or the E button) to keep doing repeatable things: picking cases, sorting, stocking.
+// Hold E / Space for the More options menu (js/menu.js). "Keep going" from that
+// menu (or holding the gamepad A button) repeats the action until you move.
 function holdRepeat(dt) {
   const k = RT.keys, p = G.player;
-  if (!(k.KeyE || k.Space || k.PadA || k.TouchE) || p.work || p.away) { RT.holdT = 0; return; }
+  if (p.away) { RT.autoRep = false; RT.holdT = 0; return; }
+  if ((k.KeyE || k.Space) && RT.eDownAt && !RT.eMenuDone && performance.now() - RT.eDownAt > HOLD_MS) { RT.eMenuDone = true; openActionMenu(); return; }
+  const j = RT.touchJoy, moving = k.KeyW || k.KeyA || k.KeyS || k.KeyD || k.ArrowUp || k.ArrowDown || k.ArrowLeft || k.ArrowRight || k.PadUp || k.PadDown || k.PadLeft || k.PadRight || (j && Math.abs(j.x) + Math.abs(j.y) > 0.25);
+  if (RT.autoRep && moving) RT.autoRep = false;
+  if (!(k.PadA || RT.autoRep) || p.work) { RT.holdT = 0; return; }
   RT.holdT = (RT.holdT || 0) + dt;
   if (RT.holdT < 0.32) return;
   RT.holdT = 0.16;
   const it = getInteraction();
   if (it && it.fn && it.rep) it.fn();
+  else RT.autoRep = false;
 }
 
 function nearestTile(p, test, r) {
@@ -1314,17 +1343,19 @@ function save() {
       v.claimedBy = null;
       if (v.state === 'stocking') { s.stock[v.dept].back += v.cases * DEPT[v.dept].upc; v.state = 'done'; }
     });
-    localStorage.setItem(SAVE_KEY, JSON.stringify(s));
+    localStorage.setItem(slotKey(SLOT), JSON.stringify(s));
+    localStorage.setItem(slotKey(SLOT) + '.meta', JSON.stringify({ day: G.day, lvl: level(), title: title(), bank: G.bank, at: Date.now() }));
   } catch (e) { console.warn('Save failed', e); }
 }
 
-function load() {
+function load(n) {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    n = n || SLOT;
+    const raw = localStorage.getItem(slotKey(n));
     if (!raw) return false;
     const s = JSON.parse(raw);
     if (s.version !== 1) return false;
-    G = s;
+    G = s; SLOT = n;
     applyCatalog();
     G.trash = G.trash || [];
     G.crew.forEach(c => ensureMorale(ensureTrain(c, 40)));
@@ -1390,14 +1421,14 @@ function boot() {
   buildMap();
   canvas.width = MW * TILE; canvas.height = MH * TILE;
   BG = drawBG();
-  const mb = document.getElementById('btn-mute'); if (mb) mb.textContent = FX.muted ? '🔇' : '🔊';
+  volIcons();
   const ver = document.getElementById('ver'); if (ver) ver.textContent = 'v' + VERSION;
   document.title = 'Grocery Practice v' + VERSION;
   if (document.fonts) document.fonts.load(PX(8)).then(() => { BG = drawBG(); }).catch(() => {});
   UI.init();
   try { RT.settings.labels = localStorage.getItem('groceryPractice.labels') === 'on'; } catch (e) { /* ignore */ }
-  if (load()) UI.showContinue();
-  else { newGame(); UI.showWelcome(); }
+  migrateOldSave();
+  showTitle(); // js/menu.js: title screen, save slots, options
   window.addEventListener('beforeunload', () => { if (G && (G.phase === 'day' || G.phase === 'night')) save(); });
   requestAnimationFrame(frame);
 }

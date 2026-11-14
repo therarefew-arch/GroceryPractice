@@ -8,6 +8,9 @@ const TOUCH = (() => {
   const q = new URLSearchParams(location.search).get('touch');
   if (q === '1') return true;
   if (q === '0') return false;
+  let m = null; try { m = localStorage.getItem('groceryPractice.mode'); } catch (e) { /* ignore */ }
+  if (m === 'phone') return true; // Options → Controls (js/menu.js)
+  if (m === 'desktop') return false;
   return (window.matchMedia && matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window;
 })();
 
@@ -82,8 +85,7 @@ function setupTouch() {
 
   // ---- buttons ----
   const tap = (id, fn) => el.querySelector(id).addEventListener('pointerdown', e => { e.preventDefault(); fn(e); });
-  tap('#t-e', () => { RT.keys.TouchE = true; RT.holdT = 0; touchInteract(); });
-  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => el.querySelector('#t-e').addEventListener(ev, () => { RT.keys.TouchE = false; }));
+  // E: tap to act, hold for More options (wired in js/menu.js)
   tap('#t-q', () => { if (!G || RT.modal || UI.open || isPaused() || G.player.work) return; const it = getInteraction(); if (it && it.alt && it.alt.fn) it.alt.fn(); });
   tap('#t-run', e => { RT.keys.TouchRun = !RT.keys.TouchRun; e.currentTarget.classList.toggle('on', RT.keys.TouchRun); });
   tap('#t-zin', () => setZoom(CAM.target * 1.25));
@@ -95,8 +97,6 @@ function setupTouch() {
     else if (d.requestFullscreen) d.requestFullscreen().then(() => { try { screen.orientation.lock('landscape'); } catch (e) { /* ignore */ } }).catch(() => {});
     else toast('On iPhone: tap Share → Add to Home Screen to play full screen.', 'info');
   });
-  // The action prompt at the bottom is a button too.
-  $('prompt').addEventListener('pointerdown', e => { e.preventDefault(); touchInteract(); });
   // Tap a crew member to see their info card (the mouse-hover card on a computer).
   canvas.addEventListener('pointerdown', e => {
     const b = canvas.getBoundingClientRect();

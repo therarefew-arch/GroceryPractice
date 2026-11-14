@@ -4,7 +4,7 @@
 //  No audio files — every sound is generated with WebAudio.
 // =====================================================================
 const FX = {
-  muted: false, ac: null,
+  muted: false, ac: null, vol: 0.8,
   combo: { n: 0, last: 0, best: 0 },
   parts: [],
 };
@@ -18,14 +18,14 @@ function sfxInit() {
   if (typeof musicStart === 'function') musicStart(); // js/music.js
 }
 function tone(freq, dur, opts) {
-  if (FX.muted || !FX.ac) return;
+  if (FX.muted || !FX.ac || FX.vol <= 0) return;
   opts = opts || {};
   const ac = FX.ac, t0 = ac.currentTime + (opts.delay || 0);
   const o = ac.createOscillator(), g = ac.createGain();
   o.type = opts.type || 'square';
   o.frequency.setValueAtTime(freq, t0);
   if (opts.to) o.frequency.exponentialRampToValueAtTime(opts.to, t0 + dur);
-  const v = (opts.vol || 0.06);
+  const v = Math.max(0.0002, (opts.vol || 0.06) * FX.vol * 1.25);
   g.gain.setValueAtTime(0.0001, t0);
   g.gain.exponentialRampToValueAtTime(v, t0 + 0.008);
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
@@ -47,7 +47,7 @@ const SFX = {
 function toggleMute() {
   FX.muted = !FX.muted;
   try { localStorage.setItem('groceryPractice.muted', FX.muted ? '1' : '0'); } catch (e) { /* ignore */ }
-  const b = document.getElementById('btn-mute'); if (b) b.textContent = FX.muted ? '🔇' : '🔊';
+  if (typeof volIcons === 'function') volIcons(); else { const b = document.getElementById('btn-mute'); if (b) b.textContent = FX.muted ? '🔇' : '🔊'; }
   if (!FX.muted) { sfxInit(); SFX.info(); }
 }
 window.addEventListener('keydown', sfxInit);

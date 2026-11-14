@@ -1,6 +1,6 @@
 # Grocery Practice
 
-**Version 0.0.36**
+**Version 0.0.37**
 
 A 2D grocery store manager simulator for practicing the real job: receiving the night truck, building floats, working freight, keeping the shelves full, running the crew, and ordering for tomorrow. All without blowing the labor budget.
 
@@ -95,6 +95,12 @@ It's plain HTML/JavaScript, so there's no build step.
 
 **Hiring and interviews:** three new applicants every morning (office computer → Hiring). The card shows only the résumé: the job they want, years at their last job, the skill they *claim* (it can be a star high), their wage ask (based on that claim) and the availability on their application. Interview them first: up to 3 interviews a day, 3 questions each, so pick what you need to know. "Walk me through your last job" shows their real skill, "Why are you leaving?" shows their attendance (a red flag means more call-outs), "What days and hours can you really work?" shows their real availability (1 in 5 put "open" on the application and can't actually work most of the shifts they asked for), "Tell me about a time you disagreed with a coworker" shows their personality (a hothead starts fights), and the customer question shows how they treat shoppers. Some questions on the list are illegal: age, kids or family, religion, where someone is from. Ask one and the applicant may walk out, HR emails you, and it shows on your review. You can still hire on the spot from the résumé; you find out the rest after they start.
 
+**Title screen and save slots:** the game opens on a title screen: Continue (your most recent save), New game, Load game and Options. There are 3 save slots; each shows the day, level, title, bank and when it was saved, and can be played, overwritten or deleted. In the store, 💾 saves to your slot and 📂 opens the game menu: load or delete any slot, save into an empty one, Options, or go back to the title screen. The game still saves itself at the end of each day and when you leave the page. A save from before slots moves into slot 1.
+
+**Options:** controls (Auto, 🖥 Desktop or 📱 Phone: phone gives the joystick and touch buttons on any screen), music and sound effect volume, "Now playing" pop-ups, and aisle hints on case labels.
+
+**Tap or hold:** tap E, the action bar at the bottom, or (on a computer) click the store to do the main action. Hold any of them (or right-click) for More options: the second action, Keep going (repeats the action until you move), give the nearest associate orders, save, or clock out. 🎵 and 🔊 open a volume slider with an on/off switch.
+
 **Store music:** futuristic ambient in-store radio plays in the background, generated live like the sound effects (no audio files): warm synth pads on smooth jazz-style chords, a soft electric pluck with echo, a round bass, glassy chimes and brushed hi-hats. It never repeats exactly. Four brighter day tracks and two slower, darker overnight tracks; it changes tracks every few minutes and shows "Now playing". 🎵 in the top bar turns the music on or off (🔊 still mutes everything). It pauses when you switch away from the game.
 
 **Interview scene:** an interview pauses the game and opens a sit-down scene in the office: the applicant across the desk in pixel art, a dialogue box with their answer, and your questions as buttons. Watch their face and body language as well as their words: excited, nervous, confident, defensive, uncomfortable, or "something's off" when the answer doesn't match the truth (an oversold résumé shows when you ask about their last job). A line under each answer describes what they do ("Glances away right before answering"). When the questions are used up, hire them right there or thank them and finish. ✕ steps out and you can come back with Continue.
@@ -145,6 +151,7 @@ Everything store-specific lives in [`js/data.js`](js/data.js): departments/aisle
 | `js/customers.js` | Customer interactions: questions, stock checks, price disputes and upset customers, what you say and how it lands |
 | `js/perf.js` | Performance reviews and raises: due dates, the facts on file, ratings, the merit matrix and budget |
 | `js/huddle.js` | The morning huddle: yesterday and today on one sheet, the day's priority (mistake focus), shout-outs |
+| `js/menu.js` | Title screen, save slots, options, the volume sliders and the tap / hold More options menu |
 | `js/music.js` | Store music: the generative ambient tracks, pads, pluck, bass, chimes and hats |
 | `js/ivscene.js` | The interview scene: the pixel portrait with moods, the dialogue box and the question buttons |
 | `js/interview.js` | Applicants and interviews: résumés, hidden skill, attendance, personality and real availability, the questions (and the illegal ones) |

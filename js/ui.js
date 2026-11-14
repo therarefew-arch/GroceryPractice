@@ -37,17 +37,17 @@ const UI = {
       if (e.code === 'Digit1') setSpeed(1);
       if (e.code === 'Digit2') setSpeed(2);
       if (e.code === 'Digit3') setSpeed(4);
-      if ((e.code === 'KeyE' || e.code === 'Space') && !isPaused() && !G.player.work) {
-        RT.holdT = 0;
-        const it = getInteraction();
-        if (it && it.fn) it.fn();
-      }
+      // E / Space: tap to act, hold for More options (see holdRepeat and js/menu.js)
+      if ((e.code === 'KeyE' || e.code === 'Space') && !isPaused()) { RT.eDownAt = performance.now(); RT.eMenuDone = false; }
       if (e.code === 'KeyQ' && !isPaused() && !G.player.work) {
         const it = getInteraction();
         if (it && it.alt && it.alt.fn) it.alt.fn();
       }
     });
-    window.addEventListener('keyup', e => { RT.keys[e.code] = false; });
+    window.addEventListener('keyup', e => {
+      RT.keys[e.code] = false;
+      if ((e.code === 'KeyE' || e.code === 'Space') && RT.eDownAt) { const quick = !RT.eMenuDone; RT.eDownAt = 0; if (quick) doMainAction(); }
+    });
     window.addEventListener('blur', () => { RT.keys = {}; });
     window.addEventListener('pagehide', () => { if (G && (G.phase === 'day' || G.phase === 'night')) save(); });
     document.addEventListener('visibilitychange', () => { if (document.hidden && G && (G.phase === 'day' || G.phase === 'night')) save(); });
@@ -598,7 +598,7 @@ const UI = {
     this.showModal(`<h2>🛒 Grocery Practice</h2>
       <p>You're running the store. Every night a truck comes in, and every morning that freight is waiting in <b>Receiving</b>. Get it sorted, worked to the shelf, and keep the store in stock without blowing the labor budget.</p>
       <h3>Your first morning</h3><ol>
-      <li>Walk to a pallet in the yellow <b>Receiving</b> area and press <kbd>E</kbd> to grab cases (up to 3 at once; hold <kbd>E</kbd> to keep going).</li>
+      <li>Walk to a pallet in the yellow <b>Receiving</b> area and press <kbd>E</kbd> to grab cases (up to 3 at once). Hold <kbd>E</kbd> for more options, like Keep going.</li>
       <li>Sort each case onto its department's float (blue spots). Labels tell you the aisle.</li>
       <li>Push a float (<kbd>E</kbd>) to its aisle and press <kbd>E</kbd> at the shelf to work it.</li>
       <li>Visit the <b>office computer</b> (top-right) for reports, email, hiring, endcaps and tomorrow's order.</li></ol>
@@ -651,7 +651,7 @@ const UI = {
     this.ask('Start a brand-new store?', 'Your saved progress will be erased. This can\'t be undone.', 'Start over', () => this.newGameNow(), true);
   },
   newGameNow() {
-    try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
+    clearSlot(SLOT);
     this.closeComputer();
     newGame();
     this.showWelcome();
