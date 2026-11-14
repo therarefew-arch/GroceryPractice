@@ -260,7 +260,7 @@ function planFace(c, r, dept) {
     { go: () => MAPD.access[dept] },
     { loop: dt => {
       r.label = 'Facing shelves';
-      G.face[dept] = Math.min(100, G.face[dept] + 7 * dt * sf(c));
+      G.face[dept] = Math.min(100, G.face[dept] + 7 * dt * sf(c) * ownSpeed(c, dept));
       r.progress = G.face[dept] / 100;
       if (G.face[dept] >= 99 || coolerBlocked(dept)) { r.progress = 0; return true; }
       return false;
@@ -334,7 +334,7 @@ function updateCrew(dt, gm) {
     if (!r.plan) {
       if (!on) { r.intent = 'Clocking out'; r.plan = [{ go: () => [MAPD.staffDoor] }, { do: () => { r.inBuilding = false; return true; } }]; }
       else if (G.phase === 'day' && rollMistake(c, 'focus', 0.025)) { r.plan = [{ wait: 6, label: 'On their phone' }]; r.intent = 'On their phone 📱'; }
-      else r.plan = orderPlan(c, r) || coverPlan(c, r) || recoveryPlan(c, r) || stdPlan(c, r) || ((G.trash || []).length >= 3 ? planTrash(c, r) : null) || brain(c, r) || helpPlan(c, r) || planTrash(c, r) || planIdle(c, r);
+      else r.plan = orderPlan(c, r) || coverPlan(c, r) || recoveryPlan(c, r) || stdPlan(c, r) || ownerPlan(c, r) || ((G.trash || []).length >= 3 ? planTrash(c, r) : null) || brain(c, r) || helpPlan(c, r) || planTrash(c, r) || planIdle(c, r);
     }
     runPlan(c, r, dt);
     if (r.floatId) { const f = floatById(r.floatId); if (f) { f.x = r.x + r.fx * 0.6; f.y = r.y + r.fy * 0.6; } }

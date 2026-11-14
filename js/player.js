@@ -215,6 +215,8 @@ function getInteraction() {
   if (fi) return mi ? { ...fi, alt: mi } : fi;
   const sw = !p.work && !mi && backroomInteraction(p, true);
   if (sw) return sw;
+  const owi = !p.work && ownerInteraction(p);
+  if (owi) return mi ? { ...owi, alt: mi } : owi;
   const sti = !p.work && standardsInteraction(p);
   if (mi) return sti ? { ...mi, alt: sti } : mi;
   if (sti) return sti;

@@ -1,6 +1,6 @@
 # Grocery Practice
 
-**Version 0.0.44**
+**Version 0.0.45**
 
 A 2D grocery store manager simulator for practicing the real job: receiving the night truck, building floats, working freight, keeping the shelves full, running the crew, and ordering for tomorrow. All without blowing the labor budget.
 
@@ -58,6 +58,7 @@ It's plain HTML/JavaScript, so there's no build step.
 - **Morale and conflicts:** thank people, keep schedules steady, settle fights well.
 - **Morning huddle**, **performance reviews and raises**, **progressive discipline** (verbal → written → final), **promotions to Lead**.
 - **Growing a successor (🌱):** pick a protégé, give them stretch tasks, coach them, and grow them into your Assistant Manager. Eventually the district will want them for a store of their own.
+- **Aisle owners (🏷):** give every aisle an owner (up to 2 each; their initials hang by the aisle sign). On shift they keep their own aisle full and faced between other work, and face it faster. Each aisle gets an hourly score (half how full, half how faced) shown today and over 7 days. Walk a slipping aisle with its owner to raise their bar for two days; thank the owner of a great one. The weekly review names the aisle of the week.
 - **Store standards (📏):** set habits (face your area before you clock out, grab go-backs, no cardboard on the floor, phones in the break room) and store-wide routines at a time you pick (we all face the store at 2 PM, a go-back sweep, fill every hole). Each person has their own buy-in: talk one on one, gather everyone on shift, remind them at the huddle, and thank them when they do it. It fades until it hits 100%; new hires start at zero.
 - **Crew orders:** click (or tap) an associate to tell them exactly what to do.
 
@@ -98,6 +99,7 @@ Everything store-specific lives in [`js/data.js`](js/data.js): departments/aisle
 | `js/perf.js` | Performance reviews and raises: due dates, the facts on file, ratings, the merit matrix and budget |
 | `js/successor.js` | Growing a successor: the protégé, stretch tasks, development talks, promotion to Lead and Assistant Manager, the own-store offer |
 | `js/standards.js` | Store standards: habits and timed routines, each associate's buy-in, one-on-one and group talks, the 📏 Standards tab |
+| `js/owners.js` | Aisle owners: who owns which aisle, owners looking after their aisle, aisle scores, the accountability walk, initials tags |
 | `js/huddle.js` | The morning huddle: yesterday and today on one sheet, the day's priority (mistake focus), shout-outs |
 | `js/guide.js` | How to play: the in-game player guide (title screen, game menu, Help tab, Day 1 welcome) |
 | `js/menu.js` | Title screen, save slots, options, the volume sliders and the tap / hold More options menu |

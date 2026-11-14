@@ -11,7 +11,7 @@ const OT_PER_PALLET = 15, LABOR_TARGET = 12;
 const xpForLevel = L => (L - 1) * 400 + 100 * (L - 1) * (L - 2); // total XP to reach level L
 function levelOf(xp) { let L = 1; while (xpForLevel(L + 1) <= xp) L++; return L; }
 const MAX_CREW = 14; // the building only holds so many associates
-const VERSION = '0.0.44'; // bump the last number on every update
+const VERSION = '0.0.45'; // bump the last number on every update
 
 let G = null;   // persistent, saved state
 let BG = null;  // pre-rendered static map
@@ -345,7 +345,7 @@ function endDay() {
   tenureDay();
   countsEndDay(); damagesEndDay(); cutsEndDay(); recallsEndDay(); resetsEndDay(); endcapsEndDay(); perfEndDay();
   const res = computeResults();
-  res.tips.push(...successorDay(res), ...standardsDay());
+  res.tips.push(...successorDay(res), ...standardsDay(), ...ownersDay());
   res.tips.push(...moraleDay(res), ...eventsTips(), ...backroomTips(), ...facingTips(), ...countsTips(), ...damagesTips(), ...cutsTips(), ...recallsTips(), ...resetsTips(), ...endcapsTips(), ...timeoffTips(), ...interviewTips(), ...huddleTips(), ...perfTips(), ...custTips(), ...weatherTips(), ...repsTips(), ...dmTips(), ...discTips());
   DEPTS.forEach(d => {
     G.history[d.id].push(t.demand[d.id] || 0);
@@ -355,7 +355,7 @@ function endDay() {
   res.badges.forEach(b => { G.badges[b] = (G.badges[b] || 0) + 1; });
   G.bank += res.bonus;
   addXP(res.xp);
-  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res), ...laborDayExtras(), ...backroomDayExtras(), ...facingDayExtras(), ...countsDayExtras(), ...damagesDayExtras(), ...cutsDayExtras(), ...recallsDayExtras(), ...resetsDayExtras(), ...endcapsDayExtras(), ...timeoffDayExtras(), ...interviewDayExtras(), ...huddleDayExtras(), ...perfDayExtras(), ...custDayExtras(), ...weatherDayExtras(), ...pnlDayExtras(), ...repsDayExtras(), ...dmDayExtras(), ...discDayExtras() });
+  G.pastDays.push({ day: G.day, grade: res.grade, score: Math.round(res.score), sales: t.sales, goal: t.goal, laborPct: res.laborPct, inStock: res.inStock, truckDoneAt: t.truckDoneAt, ...dayExtras(res), ...laborDayExtras(), ...ownersDayExtras(), ...backroomDayExtras(), ...facingDayExtras(), ...countsDayExtras(), ...damagesDayExtras(), ...cutsDayExtras(), ...recallsDayExtras(), ...resetsDayExtras(), ...endcapsDayExtras(), ...timeoffDayExtras(), ...interviewDayExtras(), ...huddleDayExtras(), ...perfDayExtras(), ...custDayExtras(), ...weatherDayExtras(), ...pnlDayExtras(), ...repsDayExtras(), ...dmDayExtras(), ...discDayExtras() });
   if (G.pastDays.length > 30) G.pastDays.shift();
   updateRecords(G.pastDays[G.pastDays.length - 1]);
   if (dowOf(G.day) === 'Fri') {
@@ -526,7 +526,7 @@ function orderWindowTick(prev) {
 
 function onHour(h) {
   if (h >= 9 && h <= 21) spoilCheck();
-  mentorHour(); trashHour(); moraleHour(); eventsHour(h); backroomHour(); facingHour(h); damagesHour(); recallsHour(h); resetsHour(h); endcapsHour(h); timeoffHour(); custHour(h); weatherHour(h); dmHour(h); discHour(); successorHour(h);
+  mentorHour(); trashHour(); moraleHour(); eventsHour(h); backroomHour(); facingHour(h); damagesHour(); recallsHour(h); resetsHour(h); endcapsHour(h); timeoffHour(); custHour(h); weatherHour(h); dmHour(h); discHour(); successorHour(h); ownersHour(h);
   if (h === 13 && G.sat < 55) mail('Customer Service Desk', 'Complaints are piling up', 'We\'re getting a lot of complaints about empty shelves and wrong prices today. Can someone check the floor?');
   if (h === 16) toast('🛒 Rush hour is coming (4–7 PM). Top off the fast movers now!', 'warn');
   if (h % 2 === 0) save();

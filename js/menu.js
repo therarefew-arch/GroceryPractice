@@ -179,7 +179,9 @@ function advancedActions() {
   if (it && it.fn && it.rep) out.push(['🔁', `Keep going: ${it.label}`, () => { RT.autoRep = true; toast('🔁 Keep going. Move to stop.', 'info'); }]);
   const near = crewNear(p, 3.5);
   if (near) out.push(['📌', `Give ${near.name} orders`, () => showOrders(near)]);
-  if (near && (G.standards || []).length) out.push(['📏', `Talk standards with ${near.name}`, () => UI.stdCoach(near.id)]);
+  if (near && (G.standards || []).length && !out.some(o => o[1].includes('Talk standards'))) out.push(['📏', `Talk standards with ${near.name}`, () => UI.stdCoach(near.id)]);
+  // every kind of talk with the person next to you, even when another one is the main action
+  for (const t of [devInteraction(p), ownerInteraction(p)]) if (t && t.fn && !out.some(o => o[1] === t.label)) out.push(['💬', t.label, t.fn]);
   if (RT.autoRep) out.push(['⏹', 'Stop repeating', () => { RT.autoRep = false; }]);
   out.push(['💾', `Save game (slot ${SLOT})`, () => saveToSlot(SLOT)]);
   if (!$('btn-home').classList.contains('hidden')) out.push(['🏠', 'Clock out and go home', () => askGoHome()]);

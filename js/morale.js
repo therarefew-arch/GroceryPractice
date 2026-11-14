@@ -86,7 +86,7 @@ function canPromote(c) {
 function praiseCrew(c) {
   c.praisedDay = G.day; c.lastPraised = G.day;
   bump(c, 8, 'praised');
-  stdPraise(c);
+  stdPraise(c); ownerPraise(c);
   const r = RT.crew[c.id]; if (r) floater(r.x, r.y - 1.3, '+morale', '#57f287');
   toast(`👏 You thanked ${c.name} for their work. ${moodOf(c).icon}`, 'good');
 }

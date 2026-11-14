@@ -143,6 +143,7 @@ function showOrders(c) {
   const trashN = (G.trash || []).length, waiting = G.vendorsToday.filter(v => v.state === 'waiting').length;
   let h = `<h2>📌 Orders: ${esc(c.name)}</h2>
     <p class="mute" style="margin-top:0">${ROLES[c.role].name}${c.lead ? ' · ◆ Lead' : ''}${isStar(c) ? ' · ★ Superstar' : ''} · Right now: <span class="good">${esc((r && (r.intent || r.label)) || (onShift(c) ? 'Looking for work' : 'Off the clock'))}</span></p>`;
+  if (G.owners && ownsOf(c).length) h += `<p class="mute">🏷 Owns ${ownsOf(c).map(d => `${DEPT[d].aisle} (${aisleScore(d)}%)`).join(', ')}</p>`;
   if ((G.standards || []).length) h += `<p><button onclick="UI.stdCoach(${c.id})">📏 Talk standards with ${esc(first)}</button></p>`;
   if (!onShift(c)) h += `<p class="warn">${esc(first)} isn't on the clock right now. Orders will start when their shift does (if it's today).</p>`;
   if (c.order) h += `<p>Current order: <b>${esc(orderLabel(c.order))}</b> until ${fmtTime(c.order.until)}${c.order.ooc ? ' <span class="warn">(outside their job)</span>' : ''} <button onclick="UI.order(${c.id},null)">Back to normal job</button></p>`;
