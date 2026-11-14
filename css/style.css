@@ -157,3 +157,24 @@ body.touch .toast { font-size: 15px; padding: 4px 8px; }
 #btn-home { padding: 2px 8px; }
 .tq { width: 58px; height: 58px; border-radius: 50%; font-size: 20px !important; background: #42d7ffcc !important; color: #001a22 !important; border: 2px solid #9be3ff !important; box-shadow: 0 0 12px #42d7ff66 !important; }
 body.touch .away-card { font-size: 14px; padding: 6px 8px; }
+
+/* Interview scene (js/ivscene.js) */
+#ivscene { position: fixed; inset: 0; background: #000d; display: flex; align-items: center; justify-content: center; z-index: 25; padding: 8px; }
+#ivscene.hidden { display: none; }
+.ivs-card { position: relative; width: min(760px, 100%); max-height: 100%; overflow-y: auto; background: #0f0c08; border: 2px solid #c98a2a; box-shadow: 0 0 0 4px #1a140b, 0 0 0 5px #5a4220, 0 0 40px #ffb23840; padding: 10px; }
+.ivs-top { display: flex; align-items: center; gap: 10px; font: 700 11px var(--pix); color: var(--mute); margin-bottom: 8px; }
+.ivs-top span:first-child { flex: 1; color: var(--acc); }
+.ivs-x { padding: 2px 8px; }
+.ivs-stage { position: relative; border: 2px solid #5fb8e8; box-shadow: 0 0 12px #42d7ff55; }
+.ivs-stage canvas { display: block; width: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
+.ivs-mood { position: absolute; top: -13px; right: 10px; font: 700 11px var(--pix); background: #0d1626e6; border: 1px solid; padding: 3px 8px; text-transform: uppercase; }
+.ivs-box { position: relative; margin: 18px 0 10px; background: #14223a; border: 2px solid #5fb8e8; box-shadow: 0 0 10px #42d7ff40, inset 0 0 20px #0008; padding: 14px 14px 10px; cursor: pointer; min-height: 96px; }
+.ivs-name { position: absolute; top: -13px; left: 10px; font: 700 12px var(--pix); color: #f2f7ff; background: #14223a; border: 2px solid #5fb8e8; border-top-color: var(--cyan); padding: 2px 10px; text-transform: uppercase; }
+.ivs-asked { font: 18px/1.1 var(--term); color: #9fc8e6; opacity: .75; margin-bottom: 4px; }
+.ivs-text { font: 22px/1.1 var(--term); color: #f2f7ff; min-height: 48px; }
+.ivs-body { font: 18px/1.1 var(--term); margin-top: 6px; font-style: italic; }
+.ivs-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.ivs-choices button { text-align: left; white-space: normal; min-height: 42px; padding: 6px 10px; line-height: 1.35; }
+.ivs-choices button.primary { text-align: center; }
+.ivs-hint { font: 16px var(--term); color: var(--mute); margin-top: 8px; text-align: center; }
+@media (max-width: 560px) { .ivs-choices { grid-template-columns: 1fr; } .ivs-text { font-size: 20px; } }
