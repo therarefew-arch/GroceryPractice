@@ -1,6 +1,6 @@
 # Grocery Practice
 
-**Version 0.0.46**
+**Version 0.0.47**
 
 A 2D grocery store manager simulator for practicing the real job: receiving the night truck, building floats, working freight, keeping the shelves full, running the crew, and ordering for tomorrow. All without blowing the labor budget.
 
@@ -60,7 +60,7 @@ It's plain HTML/JavaScript, so there's no build step.
 - **Growing a successor (🌱):** pick a protégé, give them stretch tasks, coach them, and grow them into your Assistant Manager. Eventually the district will want them for a store of their own.
 - **Aisle owners (🏷):** give every aisle an owner (up to 2 each; their initials hang by the aisle sign). On shift they keep their own aisle full and faced between other work, and face it faster. Each aisle gets an hourly score (half how full, half how faced) shown today and over 7 days. Walk a slipping aisle with its owner to raise their bar for two days; thank the owner of a great one. The weekly review names the aisle of the week.
 - **Store standards (📏):** set habits (face your area before you clock out, grab go-backs, no cardboard on the floor, phones in the break room) and store-wide routines at a time you pick (we all face the store at 2 PM, a go-back sweep, fill every hole). Each person has their own buy-in: talk one on one, gather everyone on shift, remind them at the huddle, and thank them when they do it. It fades until it hits 100%; new hires start at zero.
-- **Talk scenes (💬):** coaching, development talks, standards talks and aisle walks pause the game and open a one-on-one scene on the sales floor, like the interview: the associate in their store vest, their mood and body language, and how you handle it as choices. Asking first, explaining why, and agreeing together work better than blame.
+- **Talk scenes (💬):** thanking someone, asking someone who gave notice to stay, coaching, development talks, standards talks and aisle walks pause the game and open a one-on-one scene on the sales floor, like the interview: the associate in their store vest, their mood and body language, and how you handle it as choices. Specific thanks, asking why they're leaving, asking first, explaining why, and agreeing together work better than "good job," guilt or blame.
 - **Crew orders:** click (or tap) an associate to tell them exactly what to do.
 
 **The game itself**

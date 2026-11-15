@@ -83,12 +83,12 @@ function canPromote(c) {
 }
 
 // ---- Recognition / stay talk (player actions) ------------------------------
-function praiseCrew(c) {
+function praiseCrew(c, amt = 8, quiet = false) {
   c.praisedDay = G.day; c.lastPraised = G.day;
-  bump(c, 8, 'praised');
+  bump(c, amt, 'praised');
   stdPraise(c); ownerPraise(c);
   const r = RT.crew[c.id]; if (r) floater(r.x, r.y - 1.3, '+morale', '#57f287');
-  toast(`👏 You thanked ${c.name} for their work. ${moodOf(c).icon}`, 'good');
+  if (!quiet) toast(`👏 You thanked ${c.name} for their work. ${moodOf(c).icon}`, 'good');
 }
 function stayTalk(c) {
   c.stayTalk = true;
@@ -98,9 +98,9 @@ function stayTalk(c) {
 function moraleInteraction(p) {
   const near = G.crew.filter(c => { const r = RT.crew[c.id]; return r && r.inBuilding && onShift(c) && dist(r, p) < 1.4; });
   const quitter = near.find(c => c.notice && !c.stayTalk);
-  if (quitter) return { label: `Ask ${quitter.name} to stay (gave notice)`, fn: () => startWork(2, 'Talking', () => stayTalk(quitter)) };
+  if (quitter) return { label: `Ask ${quitter.name} to stay (gave notice)`, fn: () => talkOpen(quitter, 'stay') };
   const pr = near.find(c => c.praisedDay !== G.day);
-  if (pr) return { label: `Thank ${pr.name} for their work (+morale)`, fn: () => startWork(1, 'Recognizing', () => praiseCrew(pr)) };
+  if (pr) return { label: `Thank ${pr.name} for their work (+morale)`, fn: () => talkOpen(pr, 'thank') };
   return null;
 }
 

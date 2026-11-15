@@ -21,6 +21,14 @@ function crewMood(c) {
 const tsLow = c => ensureMorale(c).morale < 40;
 
 // ---- the conversations: each returns a node {line, mood, asked?, note?, choices:[{label, fn}]} ----
+const TS_WORK = { breakdown: 'how clean you sorted those pallets this morning', freight: 'how fast you got those floats worked', replen: 'catching those holes before they turned into outs', dsd: 'checking the vendors in so carefully', price: 'staying on top of the price changes', hbc: 'how HBC looks today', dairy: 'keeping the dairy cooler full', frozen: 'keeping the freezer doors full', unloader: 'getting the trailer unloaded so fast last night' };
+// The one specific thing worth thanking them for today.
+function tsSpecific(c) {
+  const s = (G.standards || []).find(x => stdDidToday(c, x.id)); if (s) return `doing "${STD_KINDS[s.kind].name}" today without being asked`;
+  const d = ownsOf(c).find(x => aisleScore(x) >= 90); if (d) return `how good ${DEPT[d].aisle} looks. That's your aisle, and it shows`;
+  return TS_WORK[c.role] || 'the work you put in today';
+}
+const tsGripe = c => Object.entries(c.gripes || {}).sort((a, b) => b[1] - a[1]).map(e => e[0]).find(k => GRIPE_TEXT[k]);
 const tsDone = () => [{ label: 'Back to work', primary: true, fn: () => null }];
 const TALKS = {
   coach(c) {
@@ -63,6 +71,40 @@ const TALKS = {
       choices: [
         { label: 'Ask where they want to grow', fn: () => { devTalk(c); return { asked: 'Where do you want to be in a year?', line: c.lead ? 'Running a shift on my own. Maybe a store someday.' : 'I want to lead a crew. I think I could.', mood: 'excited', note: 'Knowing what they want tells you which stretch tasks to give them.', choices: tsDone() }; } },
         { label: 'Tell them what you see in them', fn: () => { devTalk(c); bump(c, 3); return { asked: 'I see a lot of potential in you.', line: 'Wow. Thanks. Nobody\'s ever said that to me at work.', mood: 'excited', note: 'Saying it out loud is part of growing someone.', choices: tsDone() }; } },
+      ],
+    };
+  },
+  thank(c) {
+    if (c.praisedDay === G.day) return null;
+    return {
+      line: tsPick(['Hey! What\'s up?', 'Yeah? Need something?', 'Am I in trouble?']), mood: crewMood(c), note: 'Recognition costs nothing. The more specific, the more it means.',
+      choices: [
+        { label: 'Thank them for something specific', primary: true, fn: () => { const w = tsSpecific(c); praiseCrew(c, 10, true); return { asked: `Hey, thank you for ${w}.`, line: tsPick(['Oh! You noticed? Thanks. That means a lot.', 'Really? Thanks. I wasn\'t sure anyone saw that.', 'Ha, thanks! I\'ll keep it up.']), mood: c.trait === 'quiet' ? 'positive' : 'excited', note: 'Specific praise tells them exactly what to keep doing, and proves you were paying attention.', choices: tsDone() }; } },
+        { label: 'Good job today, keep it up', fn: () => { praiseCrew(c, 5, true); return { asked: 'Good job today. Keep it up.', line: tsPick(['Thanks!', 'Oh, okay. Thanks.', 'Sure thing.']), mood: tsLow(c) ? 'neutral' : 'positive', note: 'Nice, but general. "Good job" doesn\'t tell them what you liked, so it means less.', choices: tsDone() }; } },
+        { label: 'Thank them, then ask what would make the job easier', fn: () => {
+          praiseCrew(c, 8, true); const g = tsGripe(c);
+          if (g) c.gripes[g] = Math.max(0, c.gripes[g] - 5);
+          return { asked: 'Thanks for today. Anything that would make your job easier?', line: g ? GRIPE_TEXT[g] : tsPick(['Honestly? Not really. I like it here.', 'More carts in the back would be nice. Otherwise I\'m good.']), mood: g ? 'nervous' : 'positive', note: g ? `Now you know. ${FIX_TEXT[g]}` : 'Asking regularly is how you hear about problems before they turn into a notice.', choices: tsDone() };
+        } },
+      ],
+    };
+  },
+  stay(c) {
+    if (!c.notice || c.stayTalk) return null;
+    return {
+      line: tsLow(c) ? 'If this is about my notice... I already made up my mind.' : 'You wanted to talk? Is this about my notice?', mood: c.morale < 25 ? 'upset' : 'negative',
+      note: `They gave notice. Their last day is ${dayLabel(c.notice)}. If morale is 35% or higher by then (now ${Math.round(c.morale)}%), they stay.`,
+      choices: [
+        { label: 'Ask why they\'re leaving, and listen', primary: true, fn: () => {
+          c.stayTalk = true; bump(c, 5, 'praised'); const g = tsGripe(c);
+          return { asked: 'Before you go, can you tell me why? I want to hear it.', line: g ? GRIPE_TEXT[g] : 'I don\'t know. It just doesn\'t feel like it\'s working out.', mood: 'nervous', note: 'Listening first. Now you know what\'s really wrong. What do you say?',
+            choices: [
+              { label: 'Own it and commit to fixing it', primary: true, fn: () => { bump(c, 15, 'praised'); if (g) c.gripes[g] = Math.max(0, c.gripes[g] - 10); return { asked: g ? 'You\'re right. That\'s on me, and I\'m going to fix it.' : 'I hear you. Give me a chance to make it work.', line: c.morale >= 35 ? 'Okay... if things really change, maybe I\'ll stay.' : 'I appreciate that. I\'ll think about it.', mood: c.morale >= 35 ? 'positive' : 'neutral', note: g ? `Now follow through. ${FIX_TEXT[g]}` : 'Now follow through: thank them, steady schedule, check in daily.', choices: tsDone() }; } },
+              { label: 'Explain that\'s just how it is', fn: () => { return { asked: 'That\'s just how retail is.', line: 'Yeah. That\'s kind of why I\'m leaving.', mood: 'upset', note: 'You heard the problem and defended it. Nothing changes, so neither does their mind.', choices: tsDone() }; } },
+            ] };
+        } },
+        { label: 'Tell them how much they matter here', fn: () => { c.stayTalk = true; bump(c, 12, 'praised'); return { asked: 'You matter on this team. I don\'t want to lose you.', line: c.morale >= 35 ? 'I didn\'t know you felt that way. Maybe I\'ll stay.' : 'Thanks. I\'ll think about it.', mood: c.morale >= 35 ? 'positive' : 'neutral', note: 'It helps, but you still don\'t know why they\'re leaving. Ask first, then you can fix it.', choices: tsDone() }; } },
+        { label: 'Tell them we\'re short and need them', fn: () => { c.stayTalk = true; bump(c, -5); return { asked: 'We\'re short-staffed. You can\'t leave us now.', line: 'That\'s not my problem anymore.', mood: 'upset', note: 'Guilt makes it about the store, not them. That pushes people out faster.', choices: tsDone() }; } },
       ],
     };
   },
@@ -147,7 +189,7 @@ function tsChoose(i) {
   const next = ch.fn();
   if (next) tsSet(next); else talkClose();
 }
-const TS_TITLE = { coach: '🎓 Coaching', dev: '🌱 Development talk', std: '📏 Standards', aisle: '🏷 Aisle walk' };
+const TS_TITLE = { thank: '👏 Recognition', stay: '🚪 Stay talk', coach: '🎓 Coaching', dev: '🌱 Development talk', std: '📏 Standards', aisle: '🏷 Aisle walk' };
 function tsBuild() {
   const c = TS.c; if (!c) return;
   const M = IVS_MOODS[TS.mood];
