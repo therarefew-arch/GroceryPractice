@@ -521,9 +521,10 @@ function applyCamera() {
   const zt = G.player.away ? 1 : CAM.target;
   CAM.zoom += (zt - CAM.zoom) * 0.2;
   if (Math.abs(zt - CAM.zoom) < 0.002) CAM.zoom = zt;
-  const z = CAM.zoom, W = MW * T, H = MH * T, vw = W / z, vh = H / z;
+  // The view is the canvas size (a phone's canvas is taller than the store: js/phone.js).
+  const z = CAM.zoom, W = MW * T, H = MH * T, vw = canvas.width / z, vh = canvas.height / z;
   const p = G.player;
-  const cx = clamp(p.x * T - vw / 2, 0, W - vw), cy = clamp(p.y * T - vh / 2, 0, H - vh);
+  const cx = vw >= W ? (W - vw) / 2 : clamp(p.x * T - vw / 2, 0, W - vw), cy = vh >= H ? (H - vh) / 2 : clamp(p.y * T - vh / 2, 0, H - vh);
   CAM.x = cx; CAM.y = cy;
   ctx.setTransform(z, 0, 0, z, -cx * z, -cy * z);
   ctx.imageSmoothingEnabled = z === 1;
@@ -570,7 +571,7 @@ function render() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = true;
   if (!OVERLAY) OVERLAY = drawOverlay();
-  ctx.drawImage(OVERLAY, 0, 0);
+  ctx.drawImage(OVERLAY, 0, 0, canvas.width, canvas.height);
   drawComboMeter();
   drawMinimap();
   drawCrewTooltip();

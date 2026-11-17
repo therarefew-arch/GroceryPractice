@@ -1,6 +1,6 @@
 # Grocery Practice
 
-**Version 0.0.47**
+**Version 0.0.48**
 
 A 2D grocery store manager simulator for practicing the real job: receiving the night truck, building floats, working freight, keeping the shelves full, running the crew, and ordering for tomorrow. All without blowing the labor budget.
 
@@ -31,7 +31,7 @@ It's plain HTML/JavaScript, so there's no build step.
 
 **New to the game?** Open **📖 How to play** on the title screen, in the game menu, or under Help & Settings on the office computer. It covers controls, freight, the day, the week, the crew and grading in short sections.
 
-**On your phone:** open https://therarefew-arch.github.io/GroceryPractice/ and turn the phone sideways. Put your thumb down anywhere on the left side for the joystick, tap **E** to act, and hold **E** for more options. The ☰ button holds speed, sound, save and the game menu. To install it like an app: iPhone, Safari → Share → Add to Home Screen; Android, Chrome → ⋮ → Install app. It works offline after the first load, and your phone keeps its own saves. Options on the title screen switch between 🖥 Desktop and 📱 Phone controls.
+**On your phone:** open https://therarefew-arch.github.io/GroceryPractice/. Held upright, the game uses a phone layout: a tall view of the store, the joystick and buttons under it, and a tab bar at the bottom (🏪 Store, 📋 Today's list, 👥 who's on the floor, 📊 Stats, ☰ More for speed, zoom, sound, save and the game menu) whose panels slide up from the bottom. Put your thumb down anywhere left of the buttons for the joystick, tap **E** to act, and hold **E** for more options. Sideways works too, with the ☰ button in the top bar. To install it like an app: iPhone, Safari → Share → Add to Home Screen; Android, Chrome → ⋮ → Install app. It works offline after the first load, and your phone keeps its own saves. Options on the title screen switch between 🖥 Desktop and 📱 Phone controls.
 
 ## What's in the store
 
@@ -116,6 +116,7 @@ Everything store-specific lives in [`js/data.js`](js/data.js): departments/aisle
 | `js/damages.js` | Crushed truck cases, shelf and spill damages, the reclaim bin, damage claims, reclaim and DSD vendor credit |
 | `js/birds.js` | Backstock birds on wheels: push them to the aisle, work them, crew bird runs, putting them away |
 | `js/layout.js` | Backroom layout: movable float spots, reload staging and baler, validation, walk distances |
+| `js/phone.js` | Phone layout (screens under 600px wide): bottom tab bar, slide-up sheets, the tall game view, the office computer's section picker |
 | `js/touch.js` | Phone/tablet floating joystick and buttons, home-screen app (with `sw.js`, `manifest.webmanifest`, `icons/`) |
 | `js/orders.js` | Crew orders: click/tap an associate to assign any task, even outside their job |
 | `js/shift.js` | Your own shift: clocking in and out, off-the-clock fast-forward, crew covering vendors, spills, coolers and idle work |

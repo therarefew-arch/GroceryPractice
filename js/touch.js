@@ -11,7 +11,7 @@ const TOUCH = (() => {
   let m = null; try { m = localStorage.getItem('groceryPractice.mode'); } catch (e) { /* ignore */ }
   if (m === 'phone') return true; // Options → Controls (js/menu.js)
   if (m === 'desktop') return false;
-  return (window.matchMedia && matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window;
+  return (window.matchMedia && matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window || window.innerWidth < 600;
 })();
 
 function touchInteract() {
@@ -118,6 +118,12 @@ function layoutJoyZone() {
   const zone = $('joyzone'), bar = $('bar'); if (!zone || !bar) return;
   const b = bar.getBoundingClientRect(), H = innerHeight;
   RT.joyLayoutAt = performance.now();
+  if (document.body.classList.contains('phone')) { // phone: the strip left of the buttons, above the tab bar (js/phone.js)
+    const nav = $('bnav') ? $('bnav').offsetHeight : 0;
+    zone.style.top = Math.round(H - nav - PHONE_STRIP) + 'px'; zone.style.bottom = nav + 'px'; zone.style.width = Math.max(120, innerWidth - 236) + 'px';
+    return;
+  }
+  zone.style.width = '';
   if (H - b.bottom >= 150) { zone.style.top = Math.round(b.bottom) + 'px'; zone.style.bottom = '0px'; }
   else { zone.style.top = Math.round(H * 0.4) + 'px'; zone.style.bottom = Math.max(0, Math.round(H - b.top)) + 'px'; }
 }

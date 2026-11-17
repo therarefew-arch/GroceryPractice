@@ -155,6 +155,7 @@ function drawCrewTooltip() {
   const sx = (r.x * T - CAM.x) * CAM.zoom, sy = (r.y * T - CAM.y) * CAM.zoom;
   ctx.save(); ctx.shadowColor = role.color; ctx.shadowBlur = 12; ctx.strokeStyle = role.color; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.ellipse(sx, sy + 12 * CAM.zoom, 14 * CAM.zoom, 6 * CAM.zoom, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  if (document.body.classList.contains('phone')) return; // too small to read on a phone: tapping them opens their orders and details
 
   const doing = r.intent || r.label || 'Looking for work';
   const lines = [

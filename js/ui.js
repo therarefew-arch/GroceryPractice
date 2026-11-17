@@ -128,7 +128,9 @@ const UI = {
     const unread = G.emails.filter(m => !m.read).length;
     const tabs = [['today', '📋 Today'], ['dash', '📊 Reports'], ['mail', `📧 Email${unread ? ` (${unread})` : ''}`], ['crew', '👥 Crew'], ['sched', `🗓 Schedule${dowOf(G.day) === 'Thu' && G.sched && G.sched[weekOf(G.day) + 1] && !G.sched[weekOf(G.day) + 1].posted ? ' (!)' : ''}`], ['labor', `📑 Labor${forecastOpen() ? ' (!)' : ''}`], ['hire', '🤝 Hiring'], ['pnl', `📒 P&L${(G.pnl || []).length && !G.pnl[G.pnl.length - 1].plan ? ' (!)' : ''}`],
       ['standards', '📏 Standards'], ['display', '🏷️ Display Planner'], ['order', '📈 Forecast & Order'], ['counts', `🔢 Counts${countsToday().some(k => k.status === 'open') ? ` (${countsToday().filter(k => k.status === 'open').length})` : ''}`], ['sir', `🛒 Special Items${(G.sirs || []).some(s => s.status === 'open') ? ' (!)' : ''}`], ['layout', '🧱 Backroom Layout'], ['records', '🏆 Records'], ['help', '❓ Help & Settings']];
-    $('pc-tabs').innerHTML = tabs.map(([k, l]) => `<button class="${this.tab === k ? 'on' : ''}" onclick="UI.setTab('${k}')">${l}</button>`).join('') +
+    this.tabList = tabs;
+    const cur = tabs.find(t => t[0] === this.tab);
+    $('pc-tabs').innerHTML = `<button id="pc-pick" onclick="pcPick()">${cur ? cur[1] : 'Sections'} ▾</button>` + tabs.map(([k, l]) => `<button class="${this.tab === k ? 'on' : ''}" onclick="UI.setTab('${k}')">${l}</button>`).join('') +
       `<div style="flex:1"></div><div class="mute" style="font-size:12px;padding:6px">The clock is paused while you're logged in.</div>`;
     $('pc-main').innerHTML = main;
     stackWideTables($('pc-main'));
@@ -546,13 +548,18 @@ const UI = {
       if (f) return [DEPT[f].color, f];
       return ({ '#': ['#0b0d10', ''], D: ['#3a2b0a', '⇡'], r: ['#2e2614', ''], b: ['#2b3038', '▤'], o: ['#22303a', ''], C: ['#22303a', '⌨'], v: ['#1f3b4a', '⇡'], '=': ['#1b4b5a', '⇣'], '~': ['#000', ''] })[ch] || ['#191d22', ''];
     };
-    let grid = '<div style="overflow-x:auto"><div style="display:grid;grid-template-columns:repeat(' + MW + ',20px);gap:1px;width:max-content;background:#000;padding:2px">';
-    for (let y = 2; y <= 10; y++) for (let x = 0; x < MW; x++) {
-      const ch = MAPD.grid[y][x], [bg, tx] = cellCol(ch, x, y), f = fixtureAt(x, y);
-      const on = sel && f === sel;
-      grid += `<div onclick="UI.layClick(${x},${y})" title="${f ? fixtureName(f) : ''}" style="width:20px;height:20px;background:${bg};font:9px var(--pix);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;${on ? 'outline:2px solid #ffd34d;outline-offset:-2px;' : ''}">${tx}</div>`;
-    }
-    grid += '</div></div>';
+    // On a phone (js/phone.js) the backroom is turned on its side: 9 big cells across, scrolling down.
+    const side = typeof isPhone === 'function' && isPhone();
+    const cell = (x, y) => {
+      const ch = MAPD.grid[y][x], [bg, tx0] = cellCol(ch, x, y), f = fixtureAt(x, y);
+      const on = sel && f === sel, tx = side ? ({ '⇡': '⇠', '⇣': '⇢' })[tx0] || tx0 : tx0;
+      return `<div onclick="UI.layClick(${x},${y})" title="${f ? fixtureName(f) : ''}" style="${side ? 'aspect-ratio:1;font:17px var(--term);' : 'width:20px;height:20px;font:9px var(--pix);'}background:${bg};color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;${on ? 'outline:2px solid #ffd34d;outline-offset:-2px;' : ''}">${tx}</div>`;
+    };
+    let grid = side ? '<p class="mute">Turned on its side to fit your phone: the left edge is the back wall with the dock, and the top is the left side of the store.</p><div style="display:grid;grid-template-columns:repeat(9,1fr);gap:1px;background:#000;padding:2px">'
+      : '<div style="overflow-x:auto"><div style="display:grid;grid-template-columns:repeat(' + MW + ',20px);gap:1px;width:max-content;background:#000;padding:2px">';
+    if (side) { for (let x = 0; x < MW; x++) for (let y = 2; y <= 10; y++) grid += cell(x, y); }
+    else for (let y = 2; y <= 10; y++) for (let x = 0; x < MW; x++) grid += cell(x, y);
+    grid += side ? '</div>' : '</div></div>';
     const row = (name, a, b, why) => { const d = a - b, good = d < -0.4, bad = d > 0.4; return `<tr><td>${name}</td><td class="n"><b>${a.toFixed(1)}</b></td><td class="n mute">${b.toFixed(1)}</td><td class="n ${good ? 'good' : bad ? 'bad' : 'mute'}">${d > 0 ? '+' : ''}${d.toFixed(1)}</td><td class="mute">${why}</td></tr>`; };
     let h = `<h2>🧱 Backroom Layout</h2><p class="mute">The store can't change shape, but the backroom is yours to arrange. Click a fixture (a float spot, <b>R</b> reload staging or <b>B</b> the baler), then click open floor to move it. Fixtures can't go on receiving (amber), the dock, doorways or the backstock rack aisle, and there has to be a path around everything.</p>`;
     h += grid;
@@ -699,6 +706,18 @@ const UI = {
 
 function fit() {
   const hud = $('hud').offsetHeight, bar = $('bar').offsetHeight;
+  if (document.body.classList.contains('phone')) {
+    // Phone (js/phone.js): the game view is as tall as the space between the top bar
+    // and the controls, so the canvas takes the screen's shape instead of the store's.
+    const nav = $('bnav') ? $('bnav').offsetHeight : 0, strip = TOUCH ? PHONE_STRIP : 0;
+    const aw = window.innerWidth - 8, ah = Math.max(160, window.innerHeight - hud - bar - nav - strip - 8);
+    const h = Math.round(MW * TILE * ah / aw);
+    if (canvas.width !== MW * TILE) canvas.width = MW * TILE;
+    if (canvas.height !== h) canvas.height = h;
+    canvas.style.width = aw + 'px'; canvas.style.height = ah + 'px';
+    return;
+  }
+  if (canvas.width !== MW * TILE || canvas.height !== MH * TILE) { canvas.width = MW * TILE; canvas.height = MH * TILE; }
   const aw = window.innerWidth - 8, ah = window.innerHeight - hud - bar - 8;
   const s = Math.min(aw / canvas.width, ah / canvas.height);
   canvas.style.width = Math.floor(canvas.width * s) + 'px';
