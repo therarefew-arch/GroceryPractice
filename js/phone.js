@@ -11,7 +11,7 @@
 // =====================================================================
 const PHONE_MQ = matchMedia('(max-width: 599px)');
 const isPhone = () => PHONE_MQ.matches;
-const PHONE_STRIP = 176; // height of the joystick + buttons strip above the tab bar
+let PHONE_STRIP = 176; // height of the joystick + buttons strip above the tab bar (bigger buttons: js/gestures.js)
 const PHONE_TABS = [['floor', '🏪', 'Store'], ['today', '📋', 'Today'], ['crew', '👥', 'Crew'], ['stats', '📊', 'Stats'], ['more', '☰', 'More']];
 const SHEET = { kind: null, fn: null, title: '', lastRefresh: 0, touching: false };
 
@@ -88,7 +88,8 @@ function phoneMoreHTML() {
       <button onclick="sheetClose(); UI.loadMenu()">📂 Game menu</button>
       <button onclick="sheetClose(); UI.howToPlay()">📖 How to play</button>
       <button onclick="phoneFull()">⛶ Full screen</button>
-    </div>`;
+    </div>
+    <div class="ph-h">Buttons</div>${typeof ctrlPrefsHTML === 'function' ? ctrlPrefsHTML('sheetFill()') : ''}`;
 }
 function phoneFull() {
   const d = document.documentElement;
@@ -139,6 +140,7 @@ function phoneFrame() {
 // ---------------------------------------------------------------- layout
 function phoneLayout() {
   const on = isPhone();
+  PHONE_STRIP = Math.round(160 * ((typeof CTRL !== 'undefined' && CTRL.scale) || 1)) + 16;
   document.body.classList.toggle('phone', on);
   const nav = $('bnav');
   document.documentElement.style.setProperty('--nav-h', (on && nav ? nav.offsetHeight : 0) + 'px');

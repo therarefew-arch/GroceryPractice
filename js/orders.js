@@ -162,6 +162,7 @@ function showOrders(c) {
 // Click (or tap) an associate on the map to open their orders.
 canvas.addEventListener('click', () => {
   if (!G || RT.modal || UI.open || (G.phase !== 'day' && G.phase !== 'night')) return;
+  if (typeof GEST !== 'undefined' && performance.now() < GEST.noClickUntil) return; // that was a drag, not a tap
   const c = crewAtMouse();
   if (c && G.player.away) { toast('You\'re off the clock. Come in to give orders.', 'info'); return; }
   if (c) showOrders(c);

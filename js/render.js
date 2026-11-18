@@ -524,7 +524,12 @@ function applyCamera() {
   // The view is the canvas size (a phone's canvas is taller than the store: js/phone.js).
   const z = CAM.zoom, W = MW * T, H = MH * T, vw = canvas.width / z, vh = canvas.height / z;
   const p = G.player;
-  const cx = vw >= W ? (W - vw) / 2 : clamp(p.x * T - vw / 2, 0, W - vw), cy = vh >= H ? (H - vh) / 2 : clamp(p.y * T - vh / 2, 0, H - vh);
+  // Dragging the store (js/gestures.js) looks around; moving brings the camera back to you.
+  if (RT.moveAt && performance.now() - RT.moveAt < 150) { CAM.px = (CAM.px || 0) * 0.85; CAM.py = (CAM.py || 0) * 0.85; if (Math.abs(CAM.px) < 1) CAM.px = 0; if (Math.abs(CAM.py) < 1) CAM.py = 0; }
+  if (p.away) CAM.px = CAM.py = 0;
+  const bx = p.x * T - vw / 2, by = p.y * T - vh / 2;
+  const cx = vw >= W ? (W - vw) / 2 : clamp(bx + (CAM.px || 0), 0, W - vw), cy = vh >= H ? (H - vh) / 2 : clamp(by + (CAM.py || 0), 0, H - vh);
+  if (vw < W) CAM.px = cx - bx; if (vh < H) CAM.py = cy - by; // no pushing past the walls
   CAM.x = cx; CAM.y = cy;
   ctx.setTransform(z, 0, 0, z, -cx * z, -cy * z);
   ctx.imageSmoothingEnabled = z === 1;
@@ -556,6 +561,7 @@ function render() {
   drawDm();
   G.crew.forEach(c => { const r = RT.crew[c.id]; if (r && r.inBuilding) drawCrew(c, r); });
   if (!G.player.away) { drawTarget(); drawPlayer(); drawHeldGobacks(G.player); drawHeldDamages(G.player); }
+  if (typeof drawGestures === 'function') drawGestures();
   RT.floaters.forEach(f => {
     ctx.globalAlpha = clamp(1.4 - f.t, 0, 1);
     label(ctx, f.text, f.x * T, f.y * T, { font: PX(10), color: f.color, outline: 'rgba(0,0,0,0.9)' });

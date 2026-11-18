@@ -417,3 +417,24 @@ body.touch #h-day { white-space: nowrap; }
   .tt-menu button { font: 20px var(--term); }
   .tt-panel { padding: 14px 12px; }
 }
+
+/* Touch gestures and button settings (js/gestures.js) */
+body.touch canvas { touch-action: none; }
+#tbtns { transform: translate(var(--tbx, 0px), var(--tby, 0px)) scale(var(--tscale, 1)); transform-origin: bottom right; }
+#joy { width: calc(132px * var(--tscale, 1)); height: calc(132px * var(--tscale, 1)); }
+#joy-knob { width: calc(56px * var(--tscale, 1)); height: calc(56px * var(--tscale, 1)); margin: calc(-28px * var(--tscale, 1)) 0 0 calc(-28px * var(--tscale, 1)); }
+body.lefty #tbtns { right: auto; left: calc(16px + env(safe-area-inset-left)); transform-origin: bottom left; direction: rtl; }
+body.lefty #tbtns > * { direction: ltr; }
+body.lefty #joyzone { left: auto; right: 0; }
+body.lefty #joy { left: auto; right: calc(18px + env(safe-area-inset-right)); }
+body.ctrl-move #tbtns { outline: 3px dashed var(--gold); outline-offset: 6px; cursor: move; animation: ctrlpulse 1s infinite alternate; }
+body.ctrl-move #joyzone { pointer-events: none; }
+@keyframes ctrlpulse { to { outline-color: #ffd34d44; } }
+#ctrlbar { position: fixed; left: 8px; right: 8px; top: calc(8px + env(safe-area-inset-top)); z-index: 50; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: #0f0c08f2; border: 2px solid var(--gold); padding: 8px 10px; font-size: 20px; }
+#ctrlbar span { flex: 1; min-width: 160px; }
+#ctrlbar button { min-height: 48px; min-width: 64px; }
+@media (max-width: 599px) {
+  #joy { width: calc(120px * var(--tscale, 1)); height: calc(120px * var(--tscale, 1)); }
+  body.lefty #tbtns { right: auto; left: calc(10px + env(safe-area-inset-left)); }
+  body.lefty #joy { left: auto; right: calc(14px + env(safe-area-inset-right)); }
+}

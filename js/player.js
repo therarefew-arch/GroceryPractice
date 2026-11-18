@@ -17,8 +17,11 @@ function updatePlayer(dt) {
   // Analog stick (phone joystick or gamepad): any direction, push further to go faster.
   const joy = [RT.touchJoy, RT.padJoy].find(j => j && Math.hypot(j.x, j.y) > 0.2), jm = joy ? Math.hypot(joy.x, joy.y) : 0;
   if (jm > 0.2) { dx = joy.x; dy = joy.y; mag = Math.min(1, jm * 1.3); }
+  // tap-to-walk (js/gestures.js): the stick or a key always wins
+  if (dx || dy) RT.walk = null;
+  else if (RT.walk && !p.away) { const v = walkDir(p, dt); if (v) { dx = v.x; dy = v.y; } }
   if (dx || dy) {
-    p.work = null;
+    p.work = null; RT.moveAt = performance.now();
     const l = Math.hypot(dx, dy); dx /= l; dy /= l;
     p.fx = dx; p.fy = dy;
     let sp = (k.ShiftLeft || k.ShiftRight || k.PadRun || k.TouchRun) ? 6.5 : 4.2;

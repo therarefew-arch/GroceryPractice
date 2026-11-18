@@ -120,7 +120,8 @@ function layoutJoyZone() {
   RT.joyLayoutAt = performance.now();
   if (document.body.classList.contains('phone')) { // phone: the strip left of the buttons, above the tab bar (js/phone.js)
     const nav = $('bnav') ? $('bnav').offsetHeight : 0;
-    zone.style.top = Math.round(H - nav - PHONE_STRIP) + 'px'; zone.style.bottom = nav + 'px'; zone.style.width = Math.max(120, innerWidth - 236) + 'px';
+    const sc = (typeof CTRL !== 'undefined' && CTRL.scale) || 1;
+    zone.style.top = Math.round(H - nav - PHONE_STRIP) + 'px'; zone.style.bottom = nav + 'px'; zone.style.width = Math.max(120, innerWidth - Math.round(206 * sc) - 30) + 'px';
     return;
   }
   zone.style.width = '';
